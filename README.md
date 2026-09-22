@@ -6,6 +6,8 @@ Insta360 Think Bold 参赛项目。
 
 面向 Vlog 创作者的 Web 应用：上传一条已经剪辑好的 Vlog，先按转场切分内部镜头，再结合全片给出最多 5 条具体补拍或重剪建议。每条建议只保留 1–2 段关键证据，说明修改位置、主体动作、景别、秒数与验收条件。
 
+本分支 `experiment/happyhorse-completion` 试验自动生成补全片段：确认补拍建议后，在任务卡选择参考首帧，使用 `happyhorse-1.1-i2v` 生成候选视频，再预览、下载并提交验收。需要在服务端启用 `VIDEO_GENERATION_ENABLED=true`，详见 [HappyHorse 实验说明](docs/HAPPYHORSE_EXPERIMENT.md)。
+
 最新设计见 [Vlog 系统架构 v2](docs/VLOG_ARCHITECTURE.md)，本次按最新需求收窄旧任务书的通用素材流程；产品名为“旭光集”。提案和成员联系方式留在上级目录，不属于代码项目，不应随仓库公开。
 
 ## 当前可用状态

@@ -31,6 +31,7 @@ from app.services.diagnosis.engine import (
     diagnose,
 )
 from app.services.editing.render import render
+from app.services.diagnosis.verification import validate_verification_result
 
 
 def config_hash():
@@ -458,14 +459,7 @@ def verify_submission(job, progress):
         previous = rows(db, Evidence, run.id)
         progress("逐项验证验收条件", 0, 1)
         result = model.verify(task.data, evidence, previous)
-        if [c["check"] for c in result["checks"]] != task.data["acceptance_checks"]:
-            raise ValueError("模型未逐项返回原任务验收条件")
-        valid_ids = {e["id"] for e in evidence}
-        if any(e not in valid_ids for c in result["checks"] for e in c["evidence_ids"]):
-            raise ValueError("验收引用了不存在的新素材证据")
-        for c in result["checks"]:
-            if c["status"] == "passed" and not c["evidence_ids"]:
-                raise ValueError("通过的验收项缺少证据")
+        validate_verification_result(result, task.data, evidence)
         req = db.get(Requirement, task.data["requirement_id"])
         project_config = SimpleNamespace(**run.data["project_config"])
         new_coverage = {

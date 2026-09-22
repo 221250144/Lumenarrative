@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.models import SessionLocal, Job, uid
 from app.config import settings
 from app.api.routes import router
+from app.api.generation import router as generation_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -29,6 +30,7 @@ async def lifespan(app):
 
 app = FastAPI(title="旭光集 API", version="0.1.0", lifespan=lifespan)
 app.include_router(router)
+app.include_router(generation_router)
 
 
 @app.middleware("http")

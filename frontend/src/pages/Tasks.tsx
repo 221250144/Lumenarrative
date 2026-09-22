@@ -1,6 +1,7 @@
 import { useState } from "react";
-import type { Project, Asset, Plan, Task } from "../types";
+import type { Project, Asset, Plan, Task, Job } from "../types";
 import { Icon } from "../components/Icon";
+import { TaskGeneration } from "../components/TaskGeneration";
 import { keyEvidence, preciseTime } from "../lib/evidence";
 
 const labels: Record<string, string> = {
@@ -20,6 +21,7 @@ const statuses: Record<string, string> = {
 export function Tasks({
   project,
   assets,
+  jobs,
   plan,
   onPlan,
   onSubmit,
@@ -27,11 +29,13 @@ export function Tasks({
   onDemo,
   onEdit,
   onCopy,
+  onRefresh,
   busy,
   canPlan,
 }: {
   project: Project;
   assets: Asset[];
+  jobs: Job[];
   plan: Plan | null;
   onPlan: (budget: number | null) => void;
   onSubmit: (task: string, asset: string) => void;
@@ -39,6 +43,7 @@ export function Tasks({
   onDemo: (task: string, correct: boolean) => void;
   onEdit: () => void;
   onCopy: (text: string) => void;
+  onRefresh: () => Promise<void>;
   busy: boolean;
   canPlan: boolean;
 }) {
@@ -56,7 +61,7 @@ export function Tasks({
         <div>
           <span className="eyebrow">MAKE EVERY SHOT COUNT</span>
           <h1>Vlog 补拍与重剪清单</h1>
-          <p>对照主 Vlog 中的具体位置补拍，再上传片段检查是否解决问题。</p>
+          <p>对照具体位置补拍，或尝试 AI 生成候选镜头，再逐项验收。</p>
         </div>
         <div className="budget-control">
           <label>
@@ -148,6 +153,7 @@ export function Tasks({
                 (asset) =>
                   asset.id !== project.constraints_json.primary_asset_id,
               )}
+              jobs={jobs}
               busy={busy}
               isDemo={!!project.demo_scenario}
               onSubmit={onSubmit}
@@ -155,6 +161,7 @@ export function Tasks({
               onDemo={onDemo}
               onEdit={onEdit}
               onCopy={onCopy}
+              onRefresh={onRefresh}
             />
           ))}
         </div>
@@ -178,6 +185,7 @@ function TaskCard({
   task: t,
   index,
   assets,
+  jobs,
   busy,
   isDemo,
   onSubmit,
@@ -185,10 +193,12 @@ function TaskCard({
   onDemo,
   onEdit,
   onCopy,
+  onRefresh,
 }: {
   task: Task;
   index: number;
   assets: Asset[];
+  jobs: Job[];
   busy: boolean;
   isDemo: boolean;
   onSubmit: (task: string, asset: string) => void;
@@ -196,6 +206,7 @@ function TaskCard({
   onDemo: (task: string, correct: boolean) => void;
   onEdit: () => void;
   onCopy: (text: string) => void;
+  onRefresh: () => Promise<void>;
 }) {
   const [assetId, setAssetId] = useState("");
   const latest = t.submissions[0];
@@ -310,8 +321,20 @@ function TaskCard({
             <Icon name="copy" size={13} />
             复制提示词
           </button>
-          <small>在外部工具生成视频后，回到这里上传验证。</small>
+          <small>
+            可复制到其他生成工具，也可使用下方 HappyHorse 直接生成。
+          </small>
         </details>
+      )}
+      {["reshoot", "generate"].includes(t.type) && (
+        <TaskGeneration
+          task={t}
+          assets={assets}
+          liveJobs={jobs}
+          busy={busy}
+          onRefresh={onRefresh}
+          onSubmit={onSubmit}
+        />
       )}
       <div className="task-submit">
         {t.type === "reedit" ? (
@@ -409,7 +432,7 @@ function TaskCard({
             ))}
             {latest.verification_status === "passed" && (
               <small>
-                补拍片段已通过验收。重新诊断后可导出并对比修改效果。
+                补充片段已通过验收。重新诊断后可导出并对比修改效果。
               </small>
             )}
           </div>
