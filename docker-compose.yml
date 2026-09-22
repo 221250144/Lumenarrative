@@ -13,7 +13,7 @@ x-backend: &backend
     MODEL_PROVIDER: ${MODEL_PROVIDER:-mock}
     MODEL_BASE_URL: ${MODEL_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
     MODEL_API_KEY: ${MODEL_API_KEY:-}
-    VLM_MODEL: ${VLM_MODEL:-qwen-vl-plus}
+    VLM_MODEL: ${VLM_MODEL:-qwen3.8-max}
     LLM_MODEL: ${LLM_MODEL:-qwen-plus}
     MODEL_TIMEOUT_S: ${MODEL_TIMEOUT_S:-180}
     MODEL_CONCURRENCY: ${MODEL_CONCURRENCY:-8}

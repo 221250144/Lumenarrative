@@ -43,7 +43,7 @@ FFprobe 元信息读取不占重型媒体名额。同一素材的完整预处理
 
 ## 模型选择（2026-09-22 核实）
 
-当前部署继续使用 `qwen3-vl-plus` 做视觉观察、`qwen-plus` 做全片审阅。本次优化并发调度，没有同时更换模型，以便独立评估速度变化。
+上述基准使用 `qwen3-vl-plus`，仅用于记录并发改造时的测量结果。当前视觉观察模型已切换为 `qwen3.8-max`，全片文字审阅仍使用 `qwen-plus`；旧基准不能直接代表新模型的耗时。
 
 百炼官方把 `qwen3.8-max` 列为高能力旗舰，支持图像、视频和结构化输出；`qwen3.7-plus` 为能力与成本均衡选择，`qwen3.8-flash` 为轻量低成本选择。参见[视觉模型](https://help.aliyun.com/zh/model-studio/vision-model)和[文本模型](https://help.aliyun.com/zh/model-studio/text-generation-model)。当前业务空间的 `/models` 列表包含这些 ID；列出模型不等于已经完成该账号的推理兼容和效果验收。
 

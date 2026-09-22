@@ -18,7 +18,7 @@ Insta360 Think Bold 参赛项目。
 |计划与验证|每条建议对应具体补拍/重剪任务、最多两张参考帧、逐项验收；旧任务保留兼容|
 |粗剪|EDL 校验、顺序/入出点编辑、FFmpeg 直切 MP4、无音轨补静音、历史版本对比|
 |后台任务|真实阶段与数量、SSE、断线轮询、失败重试、本地重启后显式标记中断|
-|千问|已接入百炼专属业务空间；`qwen-plus` 文本分析与 `qwen3-vl-plus` 图片理解已通过真实调用和结构校验|
+|千问|已接入百炼专属业务空间；`qwen-plus` 文本分析与 `qwen3.8-max` 图片理解已通过真实调用和结构校验|
 |ASR|可配置兼容 multipart `/audio/transcriptions` 的服务；未配置/失败明确显示，不编造对白；尚未验证真实服务|
 |影石 SDK|`unavailable`，只提供适配接口。普通影石导出视频属于文件导入|
 |PostgreSQL / Redis / Celery|已在 Ubuntu 服务器通过 systemd 部署并验证真实任务；Docker Compose 路径尚未实际启动验收|
@@ -96,7 +96,7 @@ docs/                实施边界与验证记录
 MODEL_PROVIDER=qwen
 MODEL_BASE_URL=https://你的WorkspaceId.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
 MODEL_API_KEY=你的本地密钥
-VLM_MODEL=qwen3-vl-plus
+VLM_MODEL=qwen3.8-max
 LLM_MODEL=qwen-plus
 ```
 

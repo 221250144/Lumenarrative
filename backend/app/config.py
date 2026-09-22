@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     model_provider: str = "mock"
     model_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     model_api_key: str = ""
-    vlm_model: str = "qwen3-vl-plus"
+    vlm_model: str = "qwen3.8-max"
     llm_model: str = "qwen-plus"
     model_timeout_s: int = 180
     model_concurrency: int = Field(default=8, ge=1, le=32)
