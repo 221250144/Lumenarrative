@@ -5,8 +5,9 @@
 ## 当前状态
 
 - 前端生产构建、FastAPI、PostgreSQL 16、Redis 7、Celery 和 FFmpeg 已部署。Nginx、数据库、Redis、API 和 worker 已启用开机自启。
-- 当前代码版本为 `3d2c520a82874aae29fcaa1a3d7e08f9a2b90ff2`，视频采样帧理解与新素材视觉验收已切换为 `qwen3.8-max`；全片文字审阅保持 `qwen-plus`。服务器真实图片请求返回一条通过 schema 校验的证据，用时 39.467 秒；此检查不代表质量或并发性能基准。
-- 服务器通过公网 HTTP 验证了新版 Vlog 切分、真实千问诊断、后台队列、MP4 导出及 HTTP Range 播放；Linux 上 90 项后端测试通过。
+- 当前代码来自主分支 `main`，版本为 `3c7b27efa3d0a8835e96f1bcbbc0b3070aa51118`。建议文案使用原片时间段，右侧建议正文独立滚动；旧分析无需重跑即可显示时间段，HappyHorse 实验分支未部署。
+- 视频采样帧理解与新素材视觉验收为 `qwen3.8-max`，全片文字审阅为 `qwen-plus`。此前服务器真实图片请求返回一条通过 schema 校验的证据，用时 39.467 秒；此检查不代表质量或并发性能基准。本次界面修正未调用模型。
+- 服务器此前通过公网 HTTP 验证了新版 Vlog 切分、真实千问诊断、后台队列、MP4 导出；本次发布包 Linux 上 103 项后端测试通过，既有视频 HTTP Range 播放复验通过。
 - 按用户要求使用 `http://47.110.79.237`，不跳转 HTTPS，不要求账号密码。公网页面、健康检查和项目接口均已通过当前电脑的系统代理返回 HTTP 200；Edge 浏览器也已实际打开页面。
 - 当前电脑绕过代理的直连测试仍超时，这与浏览器实际可访问的结果不同，不能据此认定安全组未放行。若某个网络无法访问，应分别检查客户端网络路径和服务器入口。
 - 数据库、Redis、后端与管理预览端口只监听回环地址。模型密钥只在受保护的服务端配置中。
@@ -17,7 +18,7 @@
 |路径或服务|用途|
 |---|---|
 |`/opt/xuguangji/current`|指向当前发布目录的符号链接|
-|`/opt/xuguangji/releases/qwen38-20260922-2`|当前应用代码及沿用的前端构建|
+|`/opt/xuguangji/releases/review-ui-20260922`|当前主分支应用代码及新前端构建|
 |`/opt/xuguangji/venv`|Python 3.12 运行环境|
 |`/opt/xuguangji/certbot`|Certbot 5.8.0 独立环境|
 |`/etc/xuguangji/app.env`|数据库与百炼配置，`root:xuguangji`、`0640`|
@@ -92,7 +93,7 @@ uv pip compile backend/requirements.in --python-version 3.12 \
 
 ## 实际验证
 
-- Linux 后端测试：90 项通过。
+- 当前 `3c7b27e` 发布包 Linux 后端测试：103 项通过（39.22 秒）。公网 JS/CSS 的 SHA256 与本地构建一致；杭州项目 28 个镜头、5 条建议，展示文案中的内部编号已转换为时间段，机器引用保持不变。既有视频 Range 返回 206。本次环境配置与 PostgreSQL 备份位于 `/opt/xuguangji/backups/review-ui-20260922`，原发布目录保留以便回退。
 - `c807e6d` 发布包的 Linux 后端测试：90 项通过（38.64 秒）；服务器真实新模型兼容性结果保存在 `/var/lib/xuguangji/media/deployment/qwen38-20260922/result.json`。
 - Celery 实际进程数 8、共享模型上限 8、FFmpeg 命令上限 2、编解码/滤镜线程预算 4，配置已核实；8 镜头真实百炼视觉提取由串行 32.324 秒降至并行 5.340 秒，HTTP 峰值确认为 8。
 - 公网 HTTP 网页与 API 无认证请求返回 200，无 HTTPS 重定向和登录挑战。
