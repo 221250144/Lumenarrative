@@ -16,6 +16,28 @@ from app.config import settings
 
 
 @contextmanager
+def try_resource_slot(name: str):
+    """A nonblocking single-owner lock, also usable after a crashed worker exits."""
+    if not re.fullmatch(r"[a-z][a-z0-9_-]*", name):
+        raise ValueError("Invalid resource concurrency configuration")
+    folder = settings.data_dir.resolve() / ".resource-slots" / name
+    folder.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(folder / "0.lock", os.O_CREAT | os.O_RDWR | os.O_CLOEXEC, 0o600)
+    acquired = False
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquired = True
+        except BlockingIOError:
+            pass
+        yield acquired
+    finally:
+        if acquired:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
+
+
+@contextmanager
 def resource_slot(name: str, limit: int):
     if not re.fullmatch(r"[a-z][a-z0-9_-]*", name) or not 1 <= limit <= 32:
         raise ValueError("Invalid resource concurrency configuration")

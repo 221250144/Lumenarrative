@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     model_concurrency: int = Field(default=8, ge=1, le=32)
     media_concurrency: int = Field(default=2, ge=1, le=8)
     ffmpeg_threads: int = Field(default=4, ge=1, le=32)
+    video_generation_enabled: bool = True
+    video_generation_model: str = "happyhorse-1.1-i2v"
+    video_generation_base_url: str = ""
+    video_generation_concurrency: int = Field(default=1, ge=1, le=5)
+    video_generation_poll_s: float = Field(default=15, ge=1, le=60)
+    video_generation_timeout_s: int = Field(default=900, ge=30, le=3600)
     asr_base_url: str = ""
     asr_api_key: str = ""
     asr_model: str = ""

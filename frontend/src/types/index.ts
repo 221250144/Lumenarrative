@@ -59,6 +59,24 @@ export type Job = {
   analysis_id?: string;
   edit_id?: string;
   submission_id?: string;
+  task_id?: string;
+  provider_task_id?: string;
+  generation_retryable?: boolean;
+  prompt?: string;
+  duration_s?: number;
+  resolution?: "480P" | "720P" | "1080P";
+  reference_asset_id?: string;
+  reference_time_s?: number;
+};
+export type GenerationOptions = {
+  available: boolean;
+  reason?: string;
+  model: string;
+  prompt: string;
+  duration_s: number;
+  resolution: "480P" | "720P" | "1080P";
+  reference_frames: NonNullable<Task["reference_frames"]>;
+  latest_job?: Job | null;
 };
 export type Evidence = {
   id: string;
@@ -164,6 +182,7 @@ export type Check = {
 };
 export type Submission = {
   id: string;
+  asset_id?: string;
   verification_status: string;
   reason?: string;
   checks?: Check[];

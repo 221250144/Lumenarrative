@@ -328,7 +328,11 @@ export default function App() {
                   <span>{j.error_message}</span>
                   <button
                     className="small-button"
-                    disabled={!!busy}
+                    disabled={
+                      !!busy ||
+                      (j.type === "generation" &&
+                        j.generation_retryable === false)
+                    }
                     onClick={() =>
                       act("重试任务", async () => {
                         await post(`/jobs/${j.id}/retry`);
@@ -336,7 +340,9 @@ export default function App() {
                     }
                   >
                     <Icon name="refresh" size={13} />
-                    重试
+                    {j.type === "generation" && j.generation_retryable === false
+                      ? "无法直接重试"
+                      : "重试"}
                   </button>
                 </div>
               ))}
@@ -421,9 +427,11 @@ export default function App() {
             <Tasks
               project={project}
               assets={assets}
+              jobs={jobs}
               plan={plans[0] || null}
               busy={!!busy}
               canPlan={canUse}
+              onRefresh={refresh}
               onPlan={makePlan}
               onSubmit={(task, asset) =>
                 act("验证补充素材", () => submit(task, asset))

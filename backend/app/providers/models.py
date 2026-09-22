@@ -190,15 +190,26 @@ class CompatibleProvider:
         )["matches"]
 
     def verify(self, task, evidence, old_evidence):
-        return self.generate_structured(
-            "按照原任务 acceptance_checks 逐项验收新素材（checks 的 check 与给定文字逐字对应），只引用新素材证据ID。与参考证据比较连续性。不能把上传成功当作验收通过。区分任务通过和原需求被满足；无法判断必须 uncertain。",
-            {
-                "task": task,
-                "new_evidence": evidence,
-                "reference_evidence": old_evidence,
-            },
-            VerificationOutput,
+        from app.services.diagnosis.verification import validate_verification_result
+
+        instruction = (
+            "按照原任务 acceptance_checks 的顺序逐项验收新素材，checks 的 check 与给定文字逐字对应。"
+            "checks.evidence_ids 只能取 allowed_new_evidence_ids，不能引用 reference_evidence 的原片证据，也不能编造或改写编号。"
+            "参考原片证据仅用于比较连续性，不能把原片已包含的内容当作新素材完成的动作。不能把生成或上传成功当作验收通过。"
+            "区分任务通过和原需求被满足；缺乏证据或无法判断必须 uncertain。AI 候选只能评估画面表达，不构成真实到访或事件发生的证明。"
+            "若有 previous_verification 和 validation_error，请保留原验收标准，修正不合法的引用或条件，并完整返回 JSON。"
         )
+        payload = {"task": task, "new_evidence": evidence, "reference_evidence": old_evidence,
+                   "allowed_new_evidence_ids": [item["id"] for item in evidence]}
+        for attempt in range(2):
+            result = self.generate_structured(instruction, payload, VerificationOutput)
+            try:
+                return validate_verification_result(result, task, evidence)
+            except ValueError as error:
+                if attempt:
+                    raise ValueError("验收连续两次引用或条件校验失败：" + str(error)) from None
+                log.info("verification_reference_repair reason=%s", str(error))
+                payload = {**payload, "previous_verification": result, "validation_error": str(error)}
 
 
 ROLES = {

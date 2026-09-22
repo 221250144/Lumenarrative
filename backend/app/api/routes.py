@@ -50,7 +50,8 @@ from app.schemas import (
 from app.providers.storage import storage
 from app.providers.media_sources import LocalUploadAdapter, Insta360Adapter
 from app.services.media.pipeline import probe
-from app.services.media.views import asset_shots, merge_short_shots
+from app.services.media.views import asset_shots, merge_short_shots, selected_reference_frame
+from app.services.concurrency import resource_slot
 from app.services.diagnosis.vlog import select_key_evidence
 from app.services.diagnosis.presentation import ReadableReferences
 from app.services.media.demo import SCENARIOS, create_demo_asset
@@ -138,6 +139,14 @@ def job_for(db, project_id, kind, data):
     db.add(job)
     db.flush()
     return job
+
+
+def job_json(job):
+    result = serialize(job)
+    if job.type == "generation":
+        from app.services.generation import retryable
+        result["generation_retryable"] = retryable(job)
+    return result
 
 
 def asset_json(asset):
@@ -299,52 +308,51 @@ async def upload_asset(
             shutil.rmtree(folder)
             return previous
         meta = await asyncio.to_thread(probe, target)
-        # Serialize limits/revision mutations in PostgreSQL. Local mode runs one API process.
-        p = db.scalar(
-            select(Project)
-            .where(Project.id == id)
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        )
-        previous = repeated(db, f"upload:{id}", idempotency_key, fingerprint)
-        if previous:
-            shutil.rmtree(folder)
-            return previous
-        existing = db.scalars(select(Asset).where(Asset.project_id == id)).all()
-        if (
-            len(existing) >= settings.max_assets
-            or sum(a.duration_s for a in existing) + meta["duration_s"]
-            > settings.max_project_duration_s
-        ):
-            raise HTTPException(413, "超过项目素材数量或总时长限制")
-        asset = Asset(
-            id=aid,
-            project_id=id,
-            source_type=source_type,
-            original_name=Path((file.filename or "video").replace("\\", "/")).name[
-                :250
-            ],
-            storage_key=str(target.relative_to(settings.data_dir.resolve())),
-            sha256=digest.hexdigest(),
-            duration_s=meta["duration_s"],
-            width=meta["width"],
-            height=meta["height"],
-            has_audio=meta["has_audio"],
-            meta={"source_start_time": meta["source_start_time"]},
-        )
-        db.add(asset)
-        db.flush()
-        if p.input_mode in ("vlog", "rough_cut") and not p.constraints_json.get(
-            "primary_asset_id"
-        ):
-            p.constraints_json = {**p.constraints_json, "primary_asset_id": aid}
-        bump(p)
-        job = job_for(db, id, "preprocess", {"asset_id": aid})
-        response = {"asset_id": aid, "job_id": job.id}
-        remember(db, f"upload:{id}", idempotency_key, fingerprint, response)
-        response = commit_request(
-            db, f"upload:{id}", idempotency_key, fingerprint, response
-        )
+        with resource_slot("generation-project-" + id, 1):
+            # Serialize limits/revision mutations in PostgreSQL. Local mode runs one API process.
+            p = db.scalar(
+                select(Project)
+                .where(Project.id == id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+            previous = repeated(db, f"upload:{id}", idempotency_key, fingerprint)
+            if previous:
+                shutil.rmtree(folder)
+                return previous
+            from app.services.generation import check_capacity
+            try:
+                check_capacity(db, id, meta["duration_s"])
+            except ValueError as error:
+                raise HTTPException(413, str(error)) from None
+            asset = Asset(
+                id=aid,
+                project_id=id,
+                source_type=source_type,
+                original_name=Path((file.filename or "video").replace("\\", "/")).name[
+                    :250
+                ],
+                storage_key=str(target.relative_to(settings.data_dir.resolve())),
+                sha256=digest.hexdigest(),
+                duration_s=meta["duration_s"],
+                width=meta["width"],
+                height=meta["height"],
+                has_audio=meta["has_audio"],
+                meta={"source_start_time": meta["source_start_time"]},
+            )
+            db.add(asset)
+            db.flush()
+            if p.input_mode in ("vlog", "rough_cut") and not p.constraints_json.get(
+                "primary_asset_id"
+            ):
+                p.constraints_json = {**p.constraints_json, "primary_asset_id": aid}
+            bump(p)
+            job = job_for(db, id, "preprocess", {"asset_id": aid})
+            response = {"asset_id": aid, "job_id": job.id}
+            remember(db, f"upload:{id}", idempotency_key, fingerprint, response)
+            response = commit_request(
+                db, f"upload:{id}", idempotency_key, fingerprint, response
+            )
         if response["asset_id"] != aid:
             shutil.rmtree(folder)
         dispatch(response["job_id"])
@@ -383,15 +391,10 @@ def reference_frame(id: str, db: DB, at: float = 0):
     asset = get(db, Asset, id)
     if not 0 <= at < asset.duration_s:
         raise HTTPException(422, "参考帧时间超出素材范围")
-    scene = next((s for s in asset.meta.get("scene_shots", []) if s["start_s"] <= at < s["end_s"]), None)
-    frames = [f for shot in asset.meta.get("shots", [])
-              if scene is None or shot.get("shot_id") == scene["id"]
-              for f in shot["keyframes"]]
-    if scene:
-        frames += scene["keyframes"]
-    if not frames:
-        raise HTTPException(404, "参考帧尚未准备好")
-    frame = min(frames, key=lambda f: abs(f["time_s"] - at))
+    try:
+        frame = selected_reference_frame(asset, at)
+    except ValueError as error:
+        raise HTTPException(404, str(error)) from None
     return FileResponse(storage.path(frame["key"]), media_type="image/jpeg")
 
 
@@ -736,14 +739,14 @@ def edit_edl(id: str, db: DB):
 
 @router.get("/jobs/{id}")
 def get_job(id: str, db: DB):
-    return serialize(get(db, Job, id))
+    return job_json(get(db, Job, id))
 
 
 @router.get("/projects/{id}/jobs")
 def list_jobs(id: str, db: DB):
     get(db, Project, id)
     return [
-        serialize(j)
+        job_json(j)
         for j in db.scalars(
             select(Job)
             .where(Job.project_id == id)
@@ -784,14 +787,22 @@ async def job_events(id: str, request: Request):
 def retry_job(id: str, db: DB):
     job = get(db, Job, id)
     if job.status in ("running", "queued"):
-        return serialize(job)
+        if job.type == "generation":
+            # A live worker owns a per-job OS lock and ignores duplicate delivery.
+            # A dead worker's running job can resume from its saved provider ID.
+            dispatch(job.id)
+        return job_json(job)
     if job.status != "failed":
         raise HTTPException(409, "只允许重试失败任务")
+    if job.type == "generation":
+        from app.services.generation import retryable
+        if not retryable(job):
+            raise HTTPException(409, "视频生成提交结果未确认或上游任务已结束，不能自动再次提交；请先核查百炼控制台")
     job.status, job.error_code, job.error_message = "queued", None, None
     job.retry_count += 1
     db.commit()
     dispatch(job.id)
-    return serialize(job)
+    return job_json(job)
 
 
 @router.post("/demo", status_code=201)

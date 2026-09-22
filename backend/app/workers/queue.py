@@ -33,16 +33,31 @@ def dispatch(job_id):
             db.commit()
 
 
-@celery_app.task(name="xuguangji.execute")
+@celery_app.task(name="xuguangji.execute", reject_on_worker_lost=True)
 def celery_execute(job_id):
     execute(job_id)
 
 
 def execute(job_id):
     with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        is_generation = job is not None and job.type == "generation"
+    if is_generation:
+        from app.services.concurrency import try_resource_slot
+        # Claim while owning the job lock. Redelivery/retry can recover a running
+        # job after process death, but can never overlap its still-live owner.
+        with try_resource_slot("generation-job-" + job_id) as acquired:
+            if acquired:
+                _execute(job_id, recover_running=True)
+    else:
+        _execute(job_id)
+
+
+def _execute(job_id, recover_running=False):
+    with SessionLocal() as db:
         claimed = db.execute(
             update(Job)
-            .where(Job.id == job_id, Job.status == "queued")
+            .where(Job.id == job_id, Job.status.in_(["queued", "running"] if recover_running else ["queued"]))
             .values(status="running")
         )
         db.commit()
@@ -63,12 +78,14 @@ def execute(job_id):
             verify_submission,
             render_edit,
         )
+        from app.workflows.generation import generate_video
 
         handlers = {
             "preprocess": process_asset,
             "analysis": analyze,
             "verification": verify_submission,
             "render": render_edit,
+            "generation": generate_video,
         }
         handlers[job.type](job, progress)
         with SessionLocal() as db:
