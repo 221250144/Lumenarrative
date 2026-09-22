@@ -6,8 +6,8 @@
 
 本地 `.env`、服务器 `/etc/xuguangji/app.env` 会覆盖代码默认值；运行环境也需将 `VLM_MODEL` 设置为 `qwen3.8-max`。保留全局 8 个理解请求名额。之前 `qwen3-vl-plus` 的加速比不适用于新模型。
 
-服务器已发布 `c807e6da1008e35d102daa209c3a6ccc14fc80b0` 至 `/opt/xuguangji/releases/qwen38-20260922`，`current` 已切换，API 与 worker 均重新载入上述配置。发布包在 Linux 上通过 89 项测试；服务器以真实百炼凭据调用 `CompatibleProvider.analyze_clip`，一张蓝底黄色方块合成帧返回 1 条通过 schema 校验的证据，用时 39.467 秒。仅做接口兼容性验证，没有据此评价真实 Vlog 效果。
+服务器已发布 `3d2c520a82874aae29fcaa1a3d7e08f9a2b90ff2` 至 `/opt/xuguangji/releases/qwen38-20260922-2`，`current` 已切换，API 与 worker 均重新载入上述配置。发布包在 Linux 上通过 90 项测试；服务器以真实百炼凭据调用 `CompatibleProvider.analyze_clip`，一张蓝底黄色方块合成帧返回 1 条通过 schema 校验的证据，用时 39.467 秒。仅做接口兼容性验证，没有据此评价真实 Vlog 效果。
 
-数据库和队列空闲后执行切换，环境及 PostgreSQL 备份位于 `/opt/xuguangji/backups/qwen38-20260922`；原发布目录保留以便回退。worker 进程池经 Celery inspect 确认为 8。公网 `http://47.110.79.237/`、`/api/v1/health`、`/api/v1/projects` 均返回 200，没有认证挑战或 HTTPS 跳转；服务器和用户既有媒体数据均保留。
+数据库和队列空闲后执行切换，环境及 PostgreSQL 备份位于 `/opt/xuguangji/backups/qwen38-20260922-2`；原发布目录保留以便回退。worker 进程池经 Celery inspect 确认为 8。公网 `http://47.110.79.237/`、`/api/v1/health`、`/api/v1/projects` 均返回 200，没有认证挑战或 HTTPS 跳转；服务器和用户既有媒体数据均保留。
 
 参考：[百炼结构化输出](https://help.aliyun.com/en/model-studio/qwen-structured-output)。
