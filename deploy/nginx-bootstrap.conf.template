@@ -1,0 +1,12 @@
+server {
+    listen 80;
+    server_name __PUBLIC_HOST__;
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/xuguangji-acme;
+        default_type text/plain;
+    }
+    location / {
+        default_type text/plain;
+        return 503 "Xuguangji deployment is in progress.\n";
+    }
+}

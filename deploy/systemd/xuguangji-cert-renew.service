@@ -1,0 +1,8 @@
+[Unit]
+Description=Renew Xuguangji HTTPS certificates
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/xuguangji/certbot/bin/certbot renew --quiet

@@ -1,0 +1,26 @@
+[Unit]
+Description=Xuguangji API
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+Requires=postgresql.service redis-server.service
+
+[Service]
+User=xuguangji
+Group=xuguangji
+WorkingDirectory=/opt/xuguangji/current
+EnvironmentFile=/etc/xuguangji/app.env
+Environment=PYTHONPATH=/opt/xuguangji/current/backend
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/xuguangji/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/xuguangji
+
+[Install]
+WantedBy=multi-user.target
