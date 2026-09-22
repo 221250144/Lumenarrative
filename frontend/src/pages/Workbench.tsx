@@ -49,6 +49,8 @@ export function Workbench({
   const [findingPage, setFindingPage] = useState(0);
   const uploadRef = useRef<HTMLInputElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
+  const diagnosisPanelRef = useRef<HTMLElement>(null);
+  const diagnosisScrollRef = useRef<HTMLDivElement>(null);
   const primary = assets.find(
     (a) => a.id === project.constraints_json.primary_asset_id,
   );
@@ -80,6 +82,42 @@ export function Workbench({
   useEffect(() => {
     setShotPage(0);
   }, [shots.length, diagnosis?.analysis.id]);
+  useEffect(() => {
+    diagnosisScrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [tab, findingPage, diagnosis?.analysis.id]);
+  useEffect(() => {
+    const panel = diagnosisPanelRef.current;
+    if (!panel) return;
+    let frame = 0;
+    const resizePanel = () => {
+      frame = 0;
+      if (!window.matchMedia("(min-width: 1251px)").matches) return;
+      const viewport = window.innerHeight;
+      const available =
+        viewport - Math.max(16, panel.getBoundingClientRect().top) - 16;
+      const height = Math.max(Math.min(360, viewport - 32), available);
+      panel.style.setProperty(
+        "--review-panel-height",
+        `${Math.floor(height)}px`,
+      );
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(resizePanel);
+    };
+    const observer = new ResizeObserver(schedule);
+    // Notices above the workspace can change the available height after load.
+    const content = panel.closest(".main-content");
+    if (content) observer.observe(content);
+    window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", schedule, { passive: true });
+    resizePanel();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", schedule);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
   const jumpTo = (
     assetId: string,
     start: number,
@@ -330,7 +368,7 @@ export function Workbench({
           </div>
         </aside>
         <div className="preview-column">
-          <div ref={playerRef}>
+          <div className="review-player" ref={playerRef}>
             <VideoPlayer
               asset={active}
               seek={seek}
@@ -455,9 +493,12 @@ export function Workbench({
             )}
           </section>
         </div>
-        <aside className="diagnosis-panel vlog-diagnosis">
+        <aside
+          className="diagnosis-panel vlog-diagnosis"
+          ref={diagnosisPanelRef}
+        >
           <div className="panel-title">
-            <h3>
+            <h3 id="vlog-diagnosis-title">
               <Icon name="spark" />
               具体修改建议
             </h3>
@@ -486,143 +527,164 @@ export function Workbench({
               审看依据
             </button>
           </div>
-          {!diagnosis ? (
-            <div className="diagnosis-empty">
-              <div className="empty-spark">
-                <Icon name="spark" size={32} />
-              </div>
-              <h3>具体到某一秒、某一镜。</h3>
-              <p>
-                先上传一条 Vlog，查看镜头切分，
-                <br />
-                再分析换地点、动作跳跃、
-                <br />
-                结果交代等具体问题。
-              </p>
-              <div className="principle">
-                <Icon name="check" size={14} /> 每次最多 5 条优先建议
-              </div>
-              <div className="principle">
-                <Icon name="check" size={14} /> 每条最多 2 段关键证据
-              </div>
-              <div className="principle">
-                <Icon name="check" size={14} /> 说清补拍什么，插在哪里
-              </div>
-            </div>
-          ) : tab === "requirements" ? (
-            <div className="requirement-list">
-              {diagnosis.requirements.map((r) => (
-                <RequirementCard
-                  key={r.id}
-                  requirement={r}
-                  disabled={busy || !diagnosisCurrent}
-                  save={(data) => onRequirement(r.id, data)}
-                />
-              ))}
-            </div>
-          ) : (
-            <>
-              {diagnosis.vlog && (
-                <div className="vlog-overview">
-                  <span className="eyebrow">
-                    {diagnosis.vlog.vlog_type || "VLOG"}
-                  </span>
-                  <p>{diagnosis.vlog.summary}</p>
+          <div className="diagnosis-scroll-hint" id="diagnosis-scroll-hint">
+            <span>
+              <span aria-hidden="true">↕</span> 在这里上下滚动查看建议
+            </span>
+            <small>点击证据回看</small>
+          </div>
+          <div
+            className="diagnosis-scroll"
+            ref={diagnosisScrollRef}
+            tabIndex={0}
+            role="region"
+            aria-labelledby="vlog-diagnosis-title"
+            aria-describedby="diagnosis-scroll-hint"
+          >
+            {!diagnosis ? (
+              <div className="diagnosis-empty">
+                <div className="empty-spark">
+                  <Icon name="spark" size={32} />
                 </div>
-              )}
-              <div className="diagnosis-summary">
-                <div
-                  className={
-                    "summary-icon " +
-                    (actionable.length || cannotConclude ? "" : "clear")
-                  }
-                >
-                  <Icon
-                    name={actionable.length || cannotConclude ? "eye" : "check"}
-                    size={23}
+                <h3>具体到某一秒、某一镜。</h3>
+                <p>
+                  先上传一条 Vlog，查看镜头切分，
+                  <br />
+                  再分析换地点、动作跳跃、
+                  <br />
+                  结果交代等具体问题。
+                </p>
+                <div className="principle">
+                  <Icon name="check" size={14} /> 每次最多 5 条优先建议
+                </div>
+                <div className="principle">
+                  <Icon name="check" size={14} /> 每条最多 2 段关键证据
+                </div>
+                <div className="principle">
+                  <Icon name="check" size={14} /> 说清补拍什么，插在哪里
+                </div>
+              </div>
+            ) : tab === "requirements" ? (
+              <div className="requirement-list">
+                {diagnosis.requirements.map((r) => (
+                  <RequirementCard
+                    key={r.id}
+                    requirement={r}
+                    disabled={busy || !diagnosisCurrent}
+                    save={(data) => onRequirement(r.id, data)}
                   />
-                </div>
-                <div>
-                  <strong>
-                    {actionable.length
-                      ? `${actionable.length} 处值得修改或核实`
-                      : cannotConclude
-                        ? "当前信息还不足以下结论"
-                        : "暂未发现需要补拍的问题"}
-                  </strong>
-                  <p>
-                    {legacy
-                      ? "旧版结果可回看，建议重新分析。"
-                      : actionable.length
-                        ? "先回看对应镜头，再决定是否采用。"
-                        : cannotConclude
-                          ? "演示结果或不完整的画面分析，不能确认这条 Vlog 是否还需补拍。"
-                          : primary?.has_audio
-                            ? "当前画面未发现必要缺口；可结合对白继续人工审看。"
-                            : "当前画面未发现必要缺口；可继续回看切点和画面节奏。"}
-                  </p>
-                </div>
+                ))}
               </div>
-              <div className="gap-list">
-                {orderedGaps
-                  .slice(findingPage * 5, (findingPage + 1) * 5)
-                  .map((g) => (
-                    <GapCard
-                      key={g.id}
-                      gap={g}
-                      evidence={diagnosis.evidence}
-                      shots={diagnosis.shots || []}
-                      jump={jump}
-                      jumpTo={jumpTo}
-                      onChange={onGap}
-                      disabled={busy || !diagnosisCurrent}
+            ) : (
+              <>
+                {diagnosis.vlog && (
+                  <div className="vlog-overview">
+                    <span className="eyebrow">
+                      {diagnosis.vlog.vlog_type || "VLOG"}
+                    </span>
+                    <p>{diagnosis.vlog.summary}</p>
+                  </div>
+                )}
+                <div className="diagnosis-summary">
+                  <div
+                    className={
+                      "summary-icon " +
+                      (actionable.length || cannotConclude ? "" : "clear")
+                    }
+                  >
+                    <Icon
+                      name={
+                        actionable.length || cannotConclude ? "eye" : "check"
+                      }
+                      size={23}
                     />
-                  ))}
-              </div>
-              {orderedGaps.length > 5 && (
-                <Pagination
-                  page={findingPage}
-                  total={orderedGaps.length}
-                  size={5}
-                  onPage={setFindingPage}
-                  noun="历史建议"
-                />
-              )}
-              {diagnosis.analysis.coverage && (
-                <div className="coverage-note">
-                  <Icon name="eye" size={14} />
+                  </div>
                   <div>
-                    {diagnosis.analysis.coverage.visual_complete
-                      ? "画面分析已完成"
-                      : "部分画面未完成分析，结论需要复核"}
-                    {!diagnosis.analysis.coverage.audio_complete
-                      ? " · 对白信息尚未完整核实"
-                      : ""}
-                    <details>
-                      <summary>查看分析范围</summary>
-                      <small>{diagnosis.analysis.coverage.sampling_note}</small>
-                      {diagnosis.analysis.coverage.failed_ranges
-                        .slice(0, 3)
-                        .map((f, i) => (
-                          <small className="warning-text" key={i}>
-                            {f.reason}
-                          </small>
-                        ))}
-                    </details>
+                    <strong>
+                      {actionable.length
+                        ? `${actionable.length} 处值得修改或核实`
+                        : cannotConclude
+                          ? "当前信息还不足以下结论"
+                          : "暂未发现需要补拍的问题"}
+                    </strong>
+                    <p>
+                      {legacy
+                        ? "旧版结果可回看，建议重新分析。"
+                        : actionable.length
+                          ? "先回看对应镜头，再决定是否采用。"
+                          : cannotConclude
+                            ? "演示结果或不完整的画面分析，不能确认这条 Vlog 是否还需补拍。"
+                            : primary?.has_audio
+                              ? "当前画面未发现必要缺口；可结合对白继续人工审看。"
+                              : "当前画面未发现必要缺口；可继续回看切点和画面节奏。"}
+                    </p>
                   </div>
                 </div>
-              )}
-              <div className="diagnosis-bottom">
-                <button
-                  className="primary full-width"
-                  disabled={busy || !diagnosisCurrent || !actionable.length}
-                  onClick={onPlan}
-                >
-                  生成补拍与重剪清单 <Icon name="arrow" />
-                </button>
-                <small>未确认的意见会保留为待核实任务。</small>
-              </div>
-            </>
+                <div className="gap-list">
+                  {orderedGaps
+                    .slice(findingPage * 5, (findingPage + 1) * 5)
+                    .map((g) => (
+                      <GapCard
+                        key={g.id}
+                        gap={g}
+                        evidence={diagnosis.evidence}
+                        shots={diagnosis.shots || []}
+                        jump={jump}
+                        jumpTo={jumpTo}
+                        onChange={onGap}
+                        disabled={busy || !diagnosisCurrent}
+                      />
+                    ))}
+                </div>
+                {orderedGaps.length > 5 && (
+                  <Pagination
+                    page={findingPage}
+                    total={orderedGaps.length}
+                    size={5}
+                    onPage={setFindingPage}
+                    noun="历史建议"
+                  />
+                )}
+                {diagnosis.analysis.coverage && (
+                  <div className="coverage-note">
+                    <Icon name="eye" size={14} />
+                    <div>
+                      {diagnosis.analysis.coverage.visual_complete
+                        ? "画面分析已完成"
+                        : "部分画面未完成分析，结论需要复核"}
+                      {!diagnosis.analysis.coverage.audio_complete
+                        ? " · 对白信息尚未完整核实"
+                        : ""}
+                      <details>
+                        <summary>查看分析范围</summary>
+                        <small>
+                          {diagnosis.analysis.coverage.sampling_note}
+                        </small>
+                        {diagnosis.analysis.coverage.failed_ranges
+                          .slice(0, 3)
+                          .map((f, i) => (
+                            <small className="warning-text" key={i}>
+                              {f.reason}
+                            </small>
+                          ))}
+                      </details>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          {diagnosis && tab === "gaps" && (
+            <div className="diagnosis-bottom">
+              <button
+                className="primary full-width"
+                disabled={busy || !diagnosisCurrent || !actionable.length}
+                onClick={onPlan}
+              >
+                生成补拍与重剪清单 <Icon name="arrow" />
+              </button>
+              <small>未确认的意见会保留为待核实任务。</small>
+            </div>
           )}
         </aside>
       </div>

@@ -3141,6 +3141,17 @@ svg {
 .vlog-workbench {
   grid-template-columns: 205px minmax(280px, 1fr) minmax(310px, 360px);
 }
+.vlog-workbench > *,
+.diagnosis-scroll {
+  min-width: 0;
+}
+.diagnosis-scroll-hint {
+  display: none;
+}
+.diagnosis-scroll:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: -3px;
+}
 .primary-vlog {
   padding: 0 13px 15px;
 }
@@ -3527,6 +3538,81 @@ svg {
 }
 .coverage-note details {
   margin-top: 6px;
+}
+/* Keep review controls outside the scrolling findings on the three-column layout.
+   Narrow layouts retain normal page scrolling, without nested short viewports. */
+@media (min-width: 1251px) {
+  .vlog-workbench .review-player {
+    position: sticky;
+    top: 16px;
+    z-index: 2;
+    scroll-margin-top: 16px;
+  }
+  .vlog-workbench .review-player .video-stage {
+    max-height: min(420px, calc(100dvh - 210px));
+  }
+  .vlog-diagnosis {
+    position: sticky;
+    top: 16px;
+    display: flex;
+    flex-direction: column;
+    height: var(
+      --review-panel-height,
+      clamp(360px, calc(100dvh - 255px), 900px)
+    );
+    max-height: calc(100dvh - 32px);
+  }
+  .vlog-diagnosis > .panel-title,
+  .vlog-diagnosis > .diagnosis-tabs,
+  .vlog-diagnosis > .diagnosis-bottom {
+    flex-shrink: 0;
+  }
+  .diagnosis-scroll-hint {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 8px;
+    padding: 8px 14px;
+    border-bottom: 1px solid #34432c;
+    background: #202b1c;
+    color: #bfd3a5;
+    font-size: 10px;
+  }
+  .diagnosis-scroll-hint small {
+    color: #90a47b;
+    font-size: 9px;
+  }
+  .vlog-diagnosis .diagnosis-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: auto;
+    scrollbar-color: #8ca871 #1b2417;
+    overflow-wrap: anywhere;
+  }
+  .diagnosis-scroll::-webkit-scrollbar {
+    width: 11px;
+  }
+  .diagnosis-scroll::-webkit-scrollbar-track {
+    background: #1b2417;
+    border-left: 1px solid #34432c;
+  }
+  .diagnosis-scroll::-webkit-scrollbar-thumb {
+    background: #8ca871;
+    border: 3px solid #1b2417;
+    border-radius: 8px;
+  }
+  .diagnosis-scroll::-webkit-scrollbar-thumb:hover {
+    background: #bed29f;
+  }
+  .vlog-diagnosis > .diagnosis-bottom {
+    background: #1c251a;
+    box-shadow: 0 -5px 16px #0d150c55;
+  }
 }
 @media (min-width: 1600px) {
   .vlog-workbench {

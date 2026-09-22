@@ -52,6 +52,7 @@ from app.providers.media_sources import LocalUploadAdapter, Insta360Adapter
 from app.services.media.pipeline import probe
 from app.services.media.views import asset_shots
 from app.services.diagnosis.vlog import select_key_evidence
+from app.services.diagnosis.presentation import ReadableReferences
 from app.services.media.demo import SCENARIOS, create_demo_asset
 from app.services.planning.engine import plan_tasks
 from app.services.editing.render import make_timeline, validate_timeline
@@ -447,7 +448,7 @@ def diagnosis(id: str, db: DB):
     gaps = rows(db, Gap, id)
     for gap in gaps:
         gap["evidence_ids"] = select_key_evidence(evidence, gap["evidence_ids"], limit=2)
-    return {
+    return ReadableReferences(run.data.get("shots", []), evidence).payload({
         "analysis": analysis(id, db),
         "requirements": rows(db, Requirement, id),
         "evidence": evidence,
@@ -455,7 +456,7 @@ def diagnosis(id: str, db: DB):
         "gaps": gaps,
         "shots": run.data.get("shots", []),
         "vlog": run.data.get("vlog"),
-    }
+    })
 
 
 @router.patch("/requirements/{id}")
@@ -539,7 +540,22 @@ def get_plan(id: str, db: DB):
                 ],
             }
         )
-    return {**serialize(plan), "tasks": tasks}
+    run = get(db, AnalysisRun, plan.analysis_id)
+    evidence = rows(db, Evidence, run.id)
+    shots = list(run.data.get("shots", []))
+    submitted_assets = set()
+    for task in tasks:
+        for submission in task["submissions"]:
+            evidence.extend(submission.get("new_evidence", []))
+            submitted_assets.add(submission["asset_id"])
+    if submitted_assets:
+        for asset in db.scalars(select(Asset).where(
+            Asset.project_id == plan.project_id, Asset.id.in_(submitted_assets),
+        )):
+            shots.extend(asset.meta.get("scene_shots", []))
+    return ReadableReferences(shots, evidence).payload(
+        {**serialize(plan), "tasks": tasks}
+    )
 
 
 @router.get("/projects/{id}/completion-plans")
