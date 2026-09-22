@@ -152,6 +152,10 @@ engine = create_engine(
     if settings.database_url.startswith("sqlite")
     else {},
     pool_pre_ping=True,
+    **({} if settings.database_url.startswith("sqlite") else {
+        "pool_size": settings.db_pool_size,
+        "max_overflow": settings.db_max_overflow,
+    }),
 )
 if settings.database_url.startswith("sqlite"):
 

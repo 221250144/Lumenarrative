@@ -11,10 +11,12 @@ WorkingDirectory=/opt/xuguangji/current
 EnvironmentFile=/etc/xuguangji/app.env
 Environment=PYTHONPATH=/opt/xuguangji/current/backend
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/opt/xuguangji/venv/bin/celery -A app.workers.queue.celery_app worker --loglevel=INFO --concurrency=2
+Environment=WORKER_CONCURRENCY=8
+ExecStart=/opt/xuguangji/venv/bin/celery -A app.workers.queue.celery_app worker --loglevel=INFO --concurrency=${WORKER_CONCURRENCY}
+CPUQuota=800%
 Restart=on-failure
 RestartSec=5
-TimeoutStopSec=300
+TimeoutStopSec=600
 UMask=0027
 NoNewPrivileges=true
 PrivateTmp=true

@@ -1,6 +1,7 @@
 import hashlib
 import json
-from types import SimpleNamespace
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from types import MappingProxyType, SimpleNamespace
 from sqlalchemy import select, delete
 from app.config import settings
 from app.models import (
@@ -145,36 +146,75 @@ def extract_asset(db, asset, run, model, progress):
     if cached.get("key") == cache_key and not cached.get("failed_ranges"):
         # IDs are unique to this analysis; manual edits live in the project overlay.
         return [{**e, "id": uid()} for e in cached["evidence"]], [], True
-    items, failed = [], []
-    shots = asset.meta.get("shots", [])
-    for i, shot in enumerate(shots):
-        progress("提取素材证据", i, len(shots))
-        try:
-            if asset.meta.get("demo_fail"):
-                raise ValueError("固定演示：模拟分段分析失败")
-            for raw in model.analyze_clip(asset, shot):
-                item = validate_evidence(raw, asset.id, asset.duration_s, shot)
-                item["shot_id"] = shot.get("shot_id")
-                item["provenance"] = {
-                    "provider": model.name,
-                    "model": settings.vlm_model
-                    if model.name != "mock"
-                    else "fixed-fixture",
-                    "prompt_version": PROMPT_VERSION,
-                    "windows": [[shot["start_s"], shot["end_s"]]],
-                    "demo": model.name == "mock",
-                }
-                items.append(item)
-        except Exception as exc:
-            failed.append(
-                {
-                    "asset_id": asset.id,
-                    "start_s": shot["start_s"],
-                    "end_s": shot["end_s"],
-                    "reason": str(exc)[:400],
-                }
-            )
-        progress("提取素材证据", i + 1, len(shots))
+
+    def freeze(value):
+        if isinstance(value, dict):
+            return MappingProxyType({key: freeze(item) for key, item in value.items()})
+        if isinstance(value, (list, tuple)):
+            return tuple(freeze(item) for item in value)
+        return value
+
+    class ReadOnlyAsset(SimpleNamespace):
+        def __setattr__(self, name, value):
+            raise AttributeError("模型工作线程不能修改素材快照")
+
+        def __delattr__(self, name):
+            raise AttributeError("模型工作线程不能修改素材快照")
+
+    # Materialize ORM attributes on the calling thread. Worker inputs contain
+    # only immutable scalar/JSON snapshots, with no SQLAlchemy object/session.
+    snapshot = ReadOnlyAsset(**{
+        name: freeze(getattr(asset, name))
+        for name in (
+            "id", "project_id", "source_type", "original_name", "storage_key",
+            "sha256", "duration_s", "width", "height", "has_audio", "status",
+        )
+        if hasattr(asset, name)
+    }, meta=freeze({key: value for key, value in asset.meta.items() if key != "evidence_cache"}))
+    shots = snapshot.meta.get("shots", ())
+    model_name, vlm_model = model.name, settings.vlm_model
+
+    def extract_window(shot):
+        if snapshot.meta.get("demo_fail"):
+            raise ValueError("固定演示：模拟分段分析失败")
+        window_items = []
+        for raw in model.analyze_clip(snapshot, shot):
+            item = validate_evidence(raw, snapshot.id, snapshot.duration_s, shot)
+            item["shot_id"] = shot.get("shot_id")
+            item["provenance"] = {
+                "provider": model_name,
+                "model": vlm_model if model_name != "mock" else "fixed-fixture",
+                "prompt_version": PROMPT_VERSION,
+                "windows": [[shot["start_s"], shot["end_s"]]],
+                "demo": model_name == "mock",
+            }
+            window_items.append(item)
+        # No item escapes until every observation in this window is valid.
+        return window_items
+
+    window_results, window_failures = [None] * len(shots), [None] * len(shots)
+    progress("提取素材证据", 0, len(shots))
+    if shots:
+        with ThreadPoolExecutor(
+            max_workers=settings.model_concurrency, thread_name_prefix="vlog-analysis"
+        ) as pool:
+            futures = {pool.submit(extract_window, shot): i for i, shot in enumerate(shots)}
+            for completed, future in enumerate(as_completed(futures), 1):
+                index = futures[future]
+                shot = shots[index]
+                try:
+                    window_results[index] = future.result()
+                except Exception as exc:
+                    window_failures[index] = {
+                        "asset_id": snapshot.id,
+                        "start_s": shot["start_s"],
+                        "end_s": shot["end_s"],
+                        "reason": str(exc)[:400],
+                    }
+                # Job progress and all database access remain on the caller.
+                progress("提取素材证据", completed, len(shots))
+    items = [item for result in window_results if result is not None for item in result]
+    failed = [failure for failure in window_failures if failure is not None]
     transcripts = db.scalars(
         select(TranscriptSegment).where(TranscriptSegment.asset_id == asset.id)
     ).all()

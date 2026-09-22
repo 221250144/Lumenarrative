@@ -1,10 +1,13 @@
 from pathlib import Path
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     database_url: str = "sqlite:///./data/xuguangji.db"
+    db_pool_size: int = Field(default=2, ge=1, le=10)
+    db_max_overflow: int = Field(default=2, ge=0, le=10)
     data_dir: Path = Path("./data")
     queue_mode: str = "local"
     redis_url: str = "redis://localhost:6379/0"
@@ -13,8 +16,10 @@ class Settings(BaseSettings):
     model_api_key: str = ""
     vlm_model: str = "qwen3-vl-plus"
     llm_model: str = "qwen-plus"
-    model_timeout_s: int = 90
-    model_concurrency: int = 2
+    model_timeout_s: int = 180
+    model_concurrency: int = Field(default=8, ge=1, le=32)
+    media_concurrency: int = Field(default=2, ge=1, le=8)
+    ffmpeg_threads: int = Field(default=4, ge=1, le=32)
     asr_base_url: str = ""
     asr_api_key: str = ""
     asr_model: str = ""

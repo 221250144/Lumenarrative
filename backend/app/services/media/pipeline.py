@@ -11,6 +11,7 @@ import uuid
 from pathlib import Path
 from app.config import settings
 from app.providers.storage import storage
+from app.services.concurrency import resource_slot
 
 
 # Changing shot detection or timestamp selection requires a new version so older
@@ -19,8 +20,49 @@ SEGMENTATION_VERSION = "vlog-shots-v2"
 SCENE_SCORE_THRESHOLD = 0.22
 
 
+def _bounded_ffmpeg_args(args: list[str]):
+    """Apply one thread budget to every input, output and filter graph.
+
+    Media commands in this service have one final output, including image
+    sequences and null sinks. FFmpeg's codec options are scoped per file, so a
+    single global -threads would leave later decoders/encoders unrestricted.
+    """
+    threads = str(settings.ffmpeg_threads)
+    cleaned = [args[0]]
+    index = 1
+    while index < len(args):
+        argument = args[index]
+        name = argument.split("=", 1)[0].split(":", 1)[0]
+        if name in ("-threads", "-filter_threads", "-filter_complex_threads"):
+            # Existing per-stream overrides must not bypass the server budget.
+            index += 1 if "=" in argument else 2
+            continue
+        cleaned.append(argument)
+        index += 1
+    bounded = [cleaned[0], "-filter_threads", threads, "-filter_complex_threads", threads]
+    for argument in cleaned[1:]:
+        if argument == "-i":
+            bounded.extend(["-threads", threads])
+        bounded.append(argument)
+    if "-i" in cleaned:
+        bounded[-1:-1] = ["-threads", threads]
+    return bounded
+
+
 def run(args: list[str], timeout=300):
-    process = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    executable = str(args[0]) if args else ""
+    is_ffmpeg = executable == settings.ffmpeg_bin or Path(executable).name in (
+        "ffmpeg", "ffmpeg.exe",
+    )
+    if is_ffmpeg:
+        args = _bounded_ffmpeg_args(args)
+        # The slot is shared by API threads and every Celery process using the
+        # same data directory. Waiting for a slot does not consume run timeout.
+        with resource_slot("ffmpeg", settings.media_concurrency):
+            process = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    else:
+        # FFprobe is lightweight metadata inspection, not a transcode job.
+        process = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
     if process.returncode:
         raise ValueError("媒体处理失败：" + process.stderr[-700:])
     return process.stdout, process.stderr
@@ -244,6 +286,13 @@ def _extract_selected_frames(proxy, folder, frames, selected):
 
 
 def preprocess(asset, progress):
+    # Two analyses may both upgrade the same old asset. Keep all writes to its
+    # preview and frame directories exclusive while unrelated assets proceed.
+    with resource_slot("asset-" + asset.id, 1):
+        return _preprocess(asset, progress)
+
+
+def _preprocess(asset, progress):
     original = storage.path(asset.storage_key)
     folder = original.parent
     proxy = folder / "preview.mp4"

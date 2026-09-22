@@ -7,13 +7,18 @@ x-backend: &backend
     DATABASE_URL: postgresql+psycopg://xuguangji:xuguangji_local@db:5432/xuguangji
     REDIS_URL: redis://redis:6379/0
     QUEUE_MODE: celery
+    DB_POOL_SIZE: ${DB_POOL_SIZE:-2}
+    DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-2}
     DATA_DIR: /app/data
     MODEL_PROVIDER: ${MODEL_PROVIDER:-mock}
     MODEL_BASE_URL: ${MODEL_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
     MODEL_API_KEY: ${MODEL_API_KEY:-}
     VLM_MODEL: ${VLM_MODEL:-qwen-vl-plus}
     LLM_MODEL: ${LLM_MODEL:-qwen-plus}
-    MODEL_TIMEOUT_S: ${MODEL_TIMEOUT_S:-90}
+    MODEL_TIMEOUT_S: ${MODEL_TIMEOUT_S:-180}
+    MODEL_CONCURRENCY: ${MODEL_CONCURRENCY:-8}
+    MEDIA_CONCURRENCY: ${MEDIA_CONCURRENCY:-2}
+    FFMPEG_THREADS: ${FFMPEG_THREADS:-4}
     ASR_BASE_URL: ${ASR_BASE_URL:-}
     ASR_API_KEY: ${ASR_API_KEY:-}
     ASR_MODEL: ${ASR_MODEL:-}
@@ -60,7 +65,8 @@ services:
         condition: service_healthy
   worker:
     <<: *backend
-    command: [celery, -A, app.workers.queue.celery_app, worker, --loglevel=INFO, --concurrency=2]
+    cpus: 8.0
+    command: [celery, -A, app.workers.queue.celery_app, worker, --loglevel=INFO, "--concurrency=${WORKER_CONCURRENCY:-8}"]
     depends_on:
       migrate:
         condition: service_completed_successfully

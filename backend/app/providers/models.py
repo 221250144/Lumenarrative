@@ -1,7 +1,6 @@
 import base64
 import json
 import logging
-import threading
 import time
 from typing import Protocol
 import httpx
@@ -14,10 +13,10 @@ from app.schemas import (
     VlogReviewOutput,
 )
 from app.providers.storage import storage
+from app.services.concurrency import resource_slot
 
 log = logging.getLogger("xuguangji.provider")
 PROMPT_VERSION = "vlog-review-v2.0"
-gate = threading.BoundedSemaphore(max(1, settings.model_concurrency))
 
 
 class VLMProvider(Protocol):
@@ -61,7 +60,7 @@ class CompatibleProvider:
             {"role": "user", "content": content},
         ]
         started = time.monotonic()
-        with gate, httpx.Client(timeout=settings.model_timeout_s) as client:
+        with resource_slot("model", settings.model_concurrency), httpx.Client(timeout=settings.model_timeout_s) as client:
             for repair in range(2):
                 result = None
                 for attempt in range(3):
