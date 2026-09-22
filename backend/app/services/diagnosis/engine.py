@@ -27,6 +27,7 @@ def merge_evidence(items):
                 x
                 for x in reversed(merged)
                 if x["asset_id"] == item["asset_id"]
+                and x.get("shot_id") == item.get("shot_id")
                 and x["action"] == item["action"]
                 and x.get("evidence_type") == item.get("evidence_type")
                 and min(x["source_end_s"], item["source_end_s"])

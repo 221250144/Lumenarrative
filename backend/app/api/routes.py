@@ -50,6 +50,8 @@ from app.schemas import (
 from app.providers.storage import storage
 from app.providers.media_sources import LocalUploadAdapter, Insta360Adapter
 from app.services.media.pipeline import probe
+from app.services.media.views import asset_shots
+from app.services.diagnosis.vlog import select_key_evidence
 from app.services.media.demo import SCENARIOS, create_demo_asset
 from app.services.planning.engine import plan_tasks
 from app.services.editing.render import make_timeline, validate_timeline
@@ -153,6 +155,9 @@ def asset_json(asset):
             else None,
             "audio_status": meta.get("audio_status", "pending"),
             "synthetic_media": meta.get("synthetic_media", False),
+            "shots": asset_shots(asset),
+            "shot_count": len(meta.get("scene_shots", [])),
+            "segmentation_version": meta.get("segmentation_version"),
         }
     )
     return data
@@ -327,7 +332,7 @@ async def upload_asset(
         )
         db.add(asset)
         db.flush()
-        if p.input_mode == "rough_cut" and not p.constraints_json.get(
+        if p.input_mode in ("vlog", "rough_cut") and not p.constraints_json.get(
             "primary_asset_id"
         ):
             p.constraints_json = {**p.constraints_json, "primary_asset_id": aid}
@@ -376,7 +381,12 @@ def reference_frame(id: str, db: DB, at: float = 0):
     asset = get(db, Asset, id)
     if not 0 <= at < asset.duration_s:
         raise HTTPException(422, "参考帧时间超出素材范围")
-    frames = [f for shot in asset.meta.get("shots", []) for f in shot["keyframes"]]
+    scene = next((s for s in asset.meta.get("scene_shots", []) if s["start_s"] <= at < s["end_s"]), None)
+    frames = [f for shot in asset.meta.get("shots", [])
+              if scene is None or shot.get("shot_id") == scene["id"]
+              for f in shot["keyframes"]]
+    if scene:
+        frames += scene["keyframes"]
     if not frames:
         raise HTTPException(404, "参考帧尚未准备好")
     frame = min(frames, key=lambda f: abs(f["time_s"] - at))
@@ -433,12 +443,18 @@ def analysis(id: str, db: DB):
 @router.get("/analyses/{id}/diagnosis")
 def diagnosis(id: str, db: DB):
     run = get(db, AnalysisRun, id)
+    evidence = rows(db, Evidence, id)
+    gaps = rows(db, Gap, id)
+    for gap in gaps:
+        gap["evidence_ids"] = select_key_evidence(evidence, gap["evidence_ids"], limit=2)
     return {
         "analysis": analysis(id, db),
         "requirements": rows(db, Requirement, id),
-        "evidence": rows(db, Evidence, id),
+        "evidence": evidence,
         "matches": rows(db, RequirementMatch, id),
-        "gaps": rows(db, Gap, id),
+        "gaps": gaps,
+        "shots": run.data.get("shots", []),
+        "vlog": run.data.get("vlog"),
     }
 
 
@@ -472,7 +488,7 @@ def patch_gap(id: str, body: GapPatch, db: DB):
     row.data = {**row.data, "status": body.status, "human_reason": body.reason}
     overrides = {
         **p.constraints_json.get("gap_overrides", {}),
-        row.data["description"]: {"status": body.status, "reason": body.reason},
+        row.data.get("issue_key", row.data["description"]): {"status": body.status, "reason": body.reason},
     }
     p.constraints_json = {**p.constraints_json, "gap_overrides": overrides}
     db.commit()
@@ -560,6 +576,8 @@ def submit(id: str, body: SubmissionCreate, db: DB, idempotency_key: Key = None)
         "requirements"
     ) != run.data["project_config"]["constraints_json"].get("requirements"):
         raise HTTPException(409, "创作需求已变更，请重新分析并生成任务")
+    if p.input_mode != run.data["project_config"]["input_mode"] or p.constraints_json.get("primary_asset_id") != run.data["project_config"]["constraints_json"].get("primary_asset_id"):
+        raise HTTPException(409, "主片或分析模式已变更，请重新分析并生成任务")
     sub = Submission(
         id=uid(),
         project_id=p.id,
@@ -591,7 +609,9 @@ def create_edit(id: str, body: EditCreate, db: DB):
         )
     )
     primary = p.constraints_json.get("primary_asset_id")
-    protected = p.input_mode in ("rough_cut", "mixed") and not body.allow_reedit
+    protected = p.input_mode in ("vlog", "rough_cut", "mixed") and not body.allow_reedit
+    duration_limit = settings.max_project_duration_s if p.input_mode == "vlog" else p.target_duration_s
+    automatic_primary = primary if protected or p.input_mode == "vlog" else None
     if body.timeline is not None and protected:
         raise HTTPException(
             409, "初稿默认保留原顺序；需明确允许重剪才能提交自定义时间线"
@@ -600,14 +620,14 @@ def create_edit(id: str, body: EditCreate, db: DB):
         [c.model_dump() for c in body.timeline]
         if body.timeline is not None
         else make_timeline(
-            eligible_render_assets(db, id, assets, primary if protected else None),
+            eligible_render_assets(db, id, assets, automatic_primary),
             rows(db, Evidence, run.id),
             rows(db, RequirementMatch, run.id),
-            p.target_duration_s,
-            primary if protected else None,
+            duration_limit,
+            automatic_primary,
         )
     )
-    total = validate_timeline(timeline, {a.id: a for a in assets}, p.target_duration_s)
+    total = validate_timeline(timeline, {a.id: a for a in assets}, duration_limit)
     edit = EditVersion(
         id=uid(),
         project_id=id,

@@ -9,17 +9,56 @@ class StrictModel(BaseModel):
 class ProjectCreate(StrictModel):
     title: str = Field(min_length=1, max_length=200)
     intent: str = Field(min_length=1, max_length=5000)
-    target_duration_s: int = Field(default=60, ge=30, le=90)
+    target_duration_s: int = Field(default=60, ge=30, le=600)
     style: str = "自然叙事"
-    input_mode: Literal["clips", "rough_cut", "mixed"] = "clips"
+    input_mode: Literal["vlog", "clips", "rough_cut", "mixed"] = "vlog"
 
 
 class ProjectPatch(StrictModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     intent: str | None = Field(default=None, min_length=1, max_length=5000)
-    target_duration_s: int | None = Field(default=None, ge=30, le=90)
+    target_duration_s: int | None = Field(default=None, ge=30, le=600)
     style: str | None = None
     primary_asset_id: str | None = None
+    input_mode: Literal["vlog", "clips", "rough_cut", "mixed"] | None = None
+
+
+class VlogRecommendation(StrictModel):
+    kind: Literal["reshoot", "reedit"]
+    instruction: str = Field(min_length=1, max_length=400)
+    shot_scale: str = Field(max_length=60)
+    subject_action: str = Field(min_length=1, max_length=200)
+    duration_s: float = Field(gt=0, le=30)
+    insert_position: Literal["before", "after", "replace"]
+    acceptance_checks: list[str] = Field(min_length=1, max_length=3)
+
+
+class VlogFinding(StrictModel):
+    kind: Literal["missing_context", "missing_action", "missing_result", "transition", "redundant"]
+    title: str = Field(min_length=1, max_length=80)
+    observation: str = Field(min_length=1, max_length=400)
+    impact: str = Field(min_length=1, max_length=250)
+    missing_information: str = Field(min_length=1, max_length=250)
+    anchor_shot_id: str
+    related_shot_id: str | None = None
+    evidence_ids: list[str] = Field(min_length=1, max_length=8)
+    priority: Literal["should", "optional"] = "should"
+    confidence: Literal["high", "medium", "low"]
+    audio_dependent: bool = False
+    recommendation: VlogRecommendation
+
+
+class VlogChapter(StrictModel):
+    title: str = Field(min_length=1, max_length=80)
+    shot_ids: list[str] = Field(min_length=1)
+    summary: str = Field(max_length=300)
+
+
+class VlogReviewOutput(StrictModel):
+    summary: str = Field(min_length=1, max_length=600)
+    vlog_type: str = Field(min_length=1, max_length=80)
+    chapters: list[VlogChapter] = Field(default_factory=list, max_length=6)
+    findings: list[VlogFinding] = Field(default_factory=list, max_length=5)
 
 
 class RequirementDraft(StrictModel):
@@ -49,7 +88,7 @@ class EvidenceDraft(StrictModel):
 
 
 class EvidenceOutput(StrictModel):
-    evidence: list[EvidenceDraft]
+    evidence: list[EvidenceDraft] = Field(max_length=2)
 
 
 class MatchDraft(StrictModel):

@@ -75,7 +75,7 @@ export default function App() {
   useEffect(() => {
     api<Health>("/health")
       .then(setHealth)
-      .catch(() => setError("暂时无法连接本地服务，请确认后端已启动。"));
+      .catch(() => setError("暂时无法连接服务，请稍后刷新重试。"));
   }, []);
   useEffect(() => {
     activeProject.current = projectId;
@@ -135,7 +135,20 @@ export default function App() {
     }
   }
   const analyze = () =>
-    act("创建分析任务", async () => {
+    act("创建 Vlog 分析任务", async () => {
+      if (
+        project?.input_mode !== "vlog" ||
+        !project.constraints_json.primary_asset_id
+      )
+        throw new Error("请先选择一条剪好的 Vlog 作为主片。");
+      if (
+        !assets.some(
+          (a) =>
+            a.id === project.constraints_json.primary_asset_id &&
+            a.status === "ready",
+        )
+      )
+        throw new Error("主 Vlog 仍在处理，请等待镜头切分完成。");
       await post(`/projects/${projectId}/analyses`, {}, createIdempotencyKey());
     });
   const makePlan = (budget: number | null = 30) =>
@@ -165,7 +178,10 @@ export default function App() {
   const busyJob = jobs.find((j) => ["queued", "running"].includes(j.status));
   const failed = jobs.filter((j) => j.status === "failed");
   const canUse =
-    !!diagnosis &&
+    !!diagnosis?.vlog &&
+    project?.input_mode === "vlog" &&
+    diagnosis.vlog.primary_asset_id ===
+      project.constraints_json.primary_asset_id &&
     !diagnosis.analysis.stale &&
     diagnosis.analysis.status === "succeeded";
   return (
@@ -182,7 +198,7 @@ export default function App() {
         <div className="space-label">
           <span className="space-avatar">旭</span>
           <div>
-            我的创作空间<small>本地工作区</small>
+            我的创作空间<small>Vlog 工作区</small>
           </div>
           <span className="space-chevron">⌄</span>
         </div>
@@ -191,9 +207,9 @@ export default function App() {
           {(
             [
               ["projects", "grid", "我的项目"],
-              ["workspace", "spark", "叙事工作台"],
-              ["tasks", "layers", "补全与修改"],
-              ["edits", "film", "粗剪与对比"],
+              ["workspace", "spark", "Vlog 审看"],
+              ["tasks", "layers", "补拍与重剪"],
+              ["edits", "film", "版本与导出"],
             ] as const
           ).map(([key, icon, label]) => (
             <button
@@ -229,7 +245,7 @@ export default function App() {
           <Icon name="arrow" size={14} />
         </button>
         <div className="sidebar-bottom">
-          <span className="status-dot" /> 本地单用户 · v0.1
+          <span className="status-dot" /> Vlog 专用 · v0.2
         </div>
       </aside>
       <div className="main-shell">
@@ -356,9 +372,10 @@ export default function App() {
               }
               onAnalyze={analyze}
               onUpload={(files, source) =>
-                act("上传素材", async () => {
-                  for (const file of files)
-                    await upload(projectId, file, source);
+                act("上传 Vlog 并检测镜头", async () => {
+                  if (files.length !== 1)
+                    throw new Error("请一次上传一条剪好的 Vlog。");
+                  await upload(projectId, files[0], source);
                 })
               }
               onIntent={(text) =>
@@ -383,8 +400,9 @@ export default function App() {
               }
               onPlan={() => makePlan()}
               onPrimary={(id) =>
-                act("设置剪辑初稿", async () => {
+                act("设置主 Vlog", async () => {
                   await patch(`/projects/${projectId}`, {
+                    input_mode: "vlog",
                     primary_asset_id: id,
                   });
                 })

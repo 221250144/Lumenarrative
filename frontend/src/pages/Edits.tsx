@@ -23,25 +23,51 @@ export function Edits({
   const [custom, setCustom] = useState(false);
   const [allow, setAllow] = useState(false);
   const [timeline, setTimeline] = useState<Clip[]>([]);
-  const assetKey = assets
-    .filter((a) => a.status === "ready")
-    .map((a) => a.id)
-    .join(",");
-  useEffect(() => {
-    setTimeline(
-      assets
-        .filter((a) => a.status === "ready")
-        .map((a) => ({
-          asset_id: a.id,
-          source_in_s: 0,
-          source_out_s: a.duration_s,
-        })),
-    );
-  }, [assetKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const done = edits.filter((e) => e.output_url);
   const primary =
     assets.find((a) => a.id === project.constraints_json.primary_asset_id) ||
-    assets[0];
+    (project.input_mode === "vlog" ? undefined : assets[0]);
+  const assetKey =
+    project.input_mode === "vlog"
+      ? `${primary?.id}:${primary?.status}:${primary?.segmentation_version}:${primary?.shots?.length}`
+      : assets
+          .filter((a) => a.status === "ready")
+          .map((a) => a.id)
+          .join(",");
+  useEffect(() => {
+    if (project.input_mode === "vlog") {
+      setTimeline(
+        !primary || primary.status !== "ready"
+          ? []
+          : primary.shots?.length
+            ? primary.shots
+                .slice()
+                .sort((a, b) => a.start_s - b.start_s)
+                .map((shot) => ({
+                  asset_id: primary.id,
+                  source_in_s: shot.start_s,
+                  source_out_s: shot.end_s,
+                }))
+            : [
+                {
+                  asset_id: primary.id,
+                  source_in_s: 0,
+                  source_out_s: primary.duration_s,
+                },
+              ],
+      );
+    } else {
+      setTimeline(
+        assets
+          .filter((a) => a.status === "ready")
+          .map((a) => ({
+            asset_id: a.id,
+            source_in_s: 0,
+            source_out_s: a.duration_s,
+          })),
+      );
+    }
+  }, [assetKey, project.input_mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  const done = edits.filter((e) => e.output_url);
   const left =
     before === "original"
       ? primary?.preview_url
@@ -72,7 +98,7 @@ export function Edits({
         <div>
           <span className="eyebrow">SEE THE STORY COME TOGETHER</span>
           <h1>看见每一次改变</h1>
-          <p>从素材到粗剪，让修改前后的表达放在一起看。</p>
+          <p>保留主 Vlog 的镜头顺序，对比补拍与重剪前后的效果。</p>
         </div>
         <button
           className="primary"
@@ -80,7 +106,7 @@ export function Edits({
           onClick={() => onRender(custom && canEdit ? timeline : null, allow)}
         >
           <Icon name="film" />
-          生成基础粗剪
+          导出 Vlog 审看版
         </button>
       </div>
       <div className="comparison-grid">
@@ -98,7 +124,7 @@ export function Edits({
               <option value="original">
                 {project.input_mode === "clips"
                   ? "首条原始素材"
-                  : "原始剪辑初稿"}
+                  : "主 Vlog 原片"}
               </option>
               {done.map((e, i) => (
                 <option key={e.id} value={e.id}>
@@ -112,7 +138,7 @@ export function Edits({
           ) : (
             <div className="compare-empty">
               <Icon name="film" size={34} />
-              <p>上传原始素材后可预览</p>
+              <p>选择主 Vlog 后可预览</p>
             </div>
           )}
           <p>原片保留，可以随时回来对照。</p>
@@ -128,7 +154,7 @@ export function Edits({
               value={after}
               onChange={(e) => setAfter(e.target.value)}
             >
-              <option value="latest">最新粗剪</option>
+              <option value="latest">最新 Vlog 版本</option>
               {done.map((e, i) => (
                 <option key={e.id} value={e.id}>
                   版本 {done.length - i} · {time(e.duration_s)}
@@ -142,7 +168,7 @@ export function Edits({
             <div className="compare-empty">
               <Icon name="spark" size={34} />
               <p>下一版故事，正在等待发生</p>
-              <span>完成诊断后生成可播放的 MP4 粗剪</span>
+              <span>完成 Vlog 分析后导出可播放的 MP4</span>
             </div>
           )}
           <p>直切与基础编排，保留素材中的真实声音。</p>
@@ -152,9 +178,9 @@ export function Edits({
         <div className="panel-title">
           <div>
             <h3>
-              <Icon name="layers" /> 粗剪时间线
+              <Icon name="layers" /> Vlog 镜头时间线
             </h3>
-            <p>默认按诊断证据编排；初稿默认保持原顺序。</p>
+            <p>默认保留主片顺序；手动重剪从检测出的镜头开始。</p>
           </div>
           <label className="toggle-label">
             <input
@@ -173,7 +199,8 @@ export function Edits({
               checked={allow}
               onChange={(e) => setAllow(e.target.checked)}
             />
-            允许重新编排初稿。已烘焙的字幕与音乐不能恢复为独立轨道，可能出现音频衔接突兀。
+            允许重剪主
+            Vlog。成片中的字幕和配乐已合在视频里，调整切点时请回听声音衔接。
           </label>
         )}
         {custom && canEdit ? (
@@ -291,7 +318,7 @@ export function Edits({
                 <Icon name="film" />
               </span>
               <div>
-                <strong>粗剪版本 {edits.length - i}</strong>
+                <strong>Vlog 版本 {edits.length - i}</strong>
                 <small>
                   {new Date(e.created_at).toLocaleString("zh-CN")} ·{" "}
                   {time(e.duration_s)} ·{" "}
@@ -311,7 +338,7 @@ export function Edits({
                 <a
                   className="primary small"
                   href={e.output_url}
-                  download="旭光集-粗剪.mp4"
+                  download="旭光集-Vlog.mp4"
                 >
                   <Icon name="download" size={14} />
                   MP4
@@ -321,7 +348,7 @@ export function Edits({
           ))
         ) : (
           <div className="inline-empty">
-            还没有导出版本。完成素材诊断后，可以生成第一版粗剪。
+            还没有导出版本。完成 Vlog 分析后，可以导出第一版审看视频。
           </div>
         )}
       </div>

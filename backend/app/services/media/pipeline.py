@@ -1,11 +1,22 @@
+import bisect
 import hashlib
 import json
 import math
 import re
+import shutil
+import statistics
 import subprocess
+import tempfile
+import uuid
 from pathlib import Path
 from app.config import settings
 from app.providers.storage import storage
+
+
+# Changing shot detection or timestamp selection requires a new version so older
+# assets are reprocessed before their shots are used for Vlog diagnosis.
+SEGMENTATION_VERSION = "vlog-shots-v2"
+SCENE_SCORE_THRESHOLD = 0.22
 
 
 def run(args: list[str], timeout=300):
@@ -82,6 +93,156 @@ def windows(duration: float, boundaries=()):
     return result
 
 
+def _scan_frames(proxy: Path):
+    """Decode every frame once; use actual PTS, never a nominal sampling clock.
+
+    RGB scene scores detect hard cuts even when two scenes have similar luma.
+    Black intervals provide explicitly labelled fade-through-black candidates.
+    This is visual candidate detection, not semantic shot-boundary ground truth:
+    complex dissolves, whip pans and flashing lights can be missed/misclassified.
+    """
+    out, log = run(
+        [
+            settings.ffmpeg_bin, "-hide_banner", "-nostats", "-i", str(proxy),
+            "-vf",
+            "scale=320:-2,blackdetect=d=0.04:pix_th=0.10:pic_th=0.98,"
+            "format=rgb24,select='gte(scene,0)',"
+            "metadata=mode=print:key=lavfi.scene_score:file=-",
+            "-an", "-fps_mode", "passthrough", "-f", "null", "-",
+        ]
+    )
+    entries = re.findall(
+        r"frame:(\d+)\s+pts:[^\s]+\s+pts_time:([-+\d.eE]+)\s+"
+        r"lavfi.scene_score=([-+\d.eE]+)", out,
+    )
+    frames = [
+        {"frame_index": int(index), "time_s": round(float(time), 6), "score": float(score)}
+        for index, time, score in entries
+    ]
+    if not frames:
+        raise ValueError("无法解码视频关键帧，请检查视频格式")
+    black_intervals = [
+        (float(start), float(end))
+        for start, end in re.findall(
+            r"black_start:([-+\d.eE]+)\s+black_end:([-+\d.eE]+)", log
+        )
+    ]
+    return frames, black_intervals
+
+
+def _scene_boundaries(frames, black_intervals, duration):
+    timestamps = [frame["time_s"] for frame in frames]
+    steps = [b - a for a, b in zip(timestamps, timestamps[1:]) if b > a]
+    frame_step = statistics.median(steps) if steps else duration
+    # Suppress adjacent-frame flicker, but keep genuine short shots a few frames
+    # long. A fixed 1s debounce would erase exactly those Vlog montage shots.
+    debounce = max(0.015, min(0.075, frame_step * 1.1))
+    candidates = [
+        {"time_s": frame["time_s"], "score": frame["score"], "type": "hard_cut"}
+        for frame in frames
+        if frame["score"] >= SCENE_SCORE_THRESHOLD
+        and 0 < frame["time_s"] < duration
+    ]
+    fades = []
+    for start, end in black_intervals:
+        # A leading fade-in or final fade-out is not a new shot. Use one
+        # boundary through an internal black interval, aligned to a real frame.
+        if start <= frame_step or end >= duration - frame_step or end <= start:
+            continue
+        middle = (start + end) / 2
+        index = min(bisect.bisect_left(timestamps, middle), len(timestamps) - 1)
+        point = timestamps[index]
+        if 0 < point < duration:
+            fades.append({"time_s": point, "score": 1, "type": "fade_candidate"})
+            candidates = [
+                candidate for candidate in candidates
+                if not start - debounce <= candidate["time_s"] <= end + debounce
+            ]
+    candidates = sorted(candidates + fades, key=lambda item: item["time_s"])
+    kept = []
+    for candidate in candidates:
+        if kept and candidate["time_s"] - kept[-1]["time_s"] <= debounce:
+            if candidate["score"] > kept[-1]["score"]:
+                kept[-1] = candidate
+        else:
+            kept.append(candidate)
+    return kept
+
+
+def _analysis_windows(start: float, end: float):
+    """Overlap is only context within one shot, never a new transition."""
+    size, overlap = settings.window_s, settings.overlap_s
+    if size <= 0 or overlap < 0 or overlap >= size:
+        raise ValueError("分段配置必须满足 0 <= overlap < window")
+    result = []
+    cursor = start
+    while cursor < end:
+        stop = min(cursor + size, end)
+        result.append((round(cursor, 6), round(stop, 6)))
+        if stop >= end:
+            break
+        cursor = stop - overlap
+    return result
+
+
+def _sample_indices(frames, start, end, limit=4):
+    available = [
+        frame["frame_index"] for frame in frames
+        if start <= frame["time_s"] < end
+    ]
+    if not available:
+        raise ValueError("镜头范围内没有可解码画面，请重新处理素材")
+    count = min(limit, len(available))
+    if count == 1:
+        return [available[0]]
+    # Include the first/last available source frame and evenly spaced context.
+    return [available[round(i * (len(available) - 1) / (count - 1))] for i in range(count)]
+
+
+def _extract_selected_frames(proxy, folder, frames, selected):
+    """One pass, exact frame indices, isolated outputs on every retry."""
+    generation = hashlib.sha256(":".join(map(str, selected)).encode()).hexdigest()[:16]
+    destination = folder / SEGMENTATION_VERSION / generation
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="keyframes-", dir=folder) as scratch:
+        scratch = Path(scratch)
+        output = scratch / "images"
+        output.mkdir()
+        filter_file = scratch / "select.txt"
+        # A filter script avoids command-line length limits on long montages.
+        selection = "+".join(f"eq(n,{index})" for index in selected)
+        filter_file.write_text(f"select='{selection}',scale=640:-2")
+        args = [
+            settings.ffmpeg_bin, "-y", "-v", "error", "-i", str(proxy),
+            "-/filter:v", str(filter_file), "-an", "-fps_mode", "passthrough",
+            "-q:v", "3", str(output / "frame-%06d.jpg"),
+        ]
+        try:
+            run(args)
+        except ValueError as error:
+            if "Unrecognized option '/filter:v'" not in str(error):
+                raise
+            # Older distro FFmpeg uses filter_script; FFmpeg 9 removed it in
+            # favour of loading option values from files with the slash form.
+            args[args.index("-/filter:v")] = "-filter_script:v"
+            run(args)
+        images = sorted(output.glob("frame-*.jpg"))
+        if len(images) != len(selected):
+            raise ValueError("关键帧数量与时间映射不符，请重新处理素材")
+        # Never enumerate previous frame files: a retry may select fewer frames.
+        if destination.exists():
+            shutil.rmtree(destination)
+        output.rename(destination)
+    times = {frame["frame_index"]: frame["time_s"] for frame in frames}
+    return {
+        index: {
+            "time_s": round(times[index], 6),
+            "key": str((destination / f"frame-{number:06d}.jpg").relative_to(settings.data_dir.resolve())),
+        }
+        for number, index in enumerate(selected, 1)
+    }
+
+
 def preprocess(asset, progress):
     original = storage.path(asset.storage_key)
     folder = original.parent
@@ -89,159 +250,91 @@ def preprocess(asset, progress):
     progress("生成预览视频", 0, 1)
     run(
         [
-            settings.ffmpeg_bin,
-            "-y",
-            "-v",
-            "error",
-            "-protocol_whitelist",
-            "file,pipe",
-            "-i",
-            str(original),
-            "-map",
-            "0:v:0",
-            "-map",
-            "0:a:0?",
-            "-vf",
-            "scale=w='min(960,iw)':h=-2,setsar=1",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "25",
-            "-pix_fmt",
-            "yuv420p",
-            "-fps_mode",
-            "vfr",
-            "-c:a",
-            "aac",
-            "-ac",
-            "2",
-            "-ar",
-            "48000",
-            "-movflags",
-            "+faststart",
-            str(proxy),
+            settings.ffmpeg_bin, "-y", "-v", "error",
+            "-protocol_whitelist", "file,pipe", "-i", str(original),
+            "-map", "0:v:0", "-map", "0:a:0?",
+            "-vf", "setpts=PTS-STARTPTS,scale=w='min(960,iw)':h=-2,setsar=1",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "25",
+            "-pix_fmt", "yuv420p", "-fps_mode", "vfr",
+            "-c:a", "aac", "-ac", "2", "-ar", "48000",
+            "-movflags", "+faststart", str(proxy),
         ]
     )
     preview_meta = probe(proxy)
     if abs(preview_meta["duration_s"] - asset.duration_s) > 0.3:
         raise ValueError("代理视频与源视频时长偏差超过 0.3 秒，需检查时间映射")
-    _, scene_log = run(
-        [
-            settings.ffmpeg_bin,
-            "-hide_banner",
-            "-i",
-            str(proxy),
-            "-vf",
-            "select='gt(scene,0.32)',showinfo",
-            "-an",
-            "-f",
-            "null",
-            "-",
-        ]
-    )
-    boundaries = [float(x) for x in re.findall(r"pts_time:([\d.]+)", scene_log)]
-    segments = windows(asset.duration_s, boundaries)
-    # Single-pass sparse sampling: retain source-relative timestamp for each frame.
-    fps = max(0.25, min(settings.sample_fps, 4))
-    run(
-        [
-            settings.ffmpeg_bin,
-            "-y",
-            "-v",
-            "error",
-            "-i",
-            str(proxy),
-            "-vf",
-            f"fps={fps}:start_time=0,scale=640:-2",
-            "-q:v",
-            "3",
-            str(folder / "frame-%05d.jpg"),
-        ]
-    )
-    frames = [
-        {
-            "time_s": round(i / fps, 4),
-            "key": str(f.relative_to(settings.data_dir.resolve())),
-        }
-        for i, f in enumerate(sorted(folder.glob("frame-*.jpg")))
-        if i / fps < asset.duration_s
-    ]
-    shots = []
-    for i, (start, end) in enumerate(segments):
-        shots.append(
-            {
-                "start_s": start,
-                "end_s": end,
-                "keyframes": [f for f in frames if start <= f["time_s"] < end],
-            }
-        )
-        progress("抽帧与时间映射", i + 1, len(segments))
+    progress("识别 Vlog 镜头与转场", 0, 1)
+    frames, black_intervals = _scan_frames(proxy)
+    frames = [frame for frame in frames if 0 <= frame["time_s"] < asset.duration_s]
+    boundaries = _scene_boundaries(frames, black_intervals, asset.duration_s)
+    starts = [{"time_s": 0.0, "type": "start"}, *boundaries]
+    scene_shots, analysis = [], []
+    selections = set()
+    for index, (begin, end) in enumerate(
+        zip(starts, [*[item["time_s"] for item in boundaries], asset.duration_s]), 1
+    ):
+        start, end = round(begin["time_s"], 6), round(end, 6)
+        shot_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"xuguangji:{asset.id}:{start:.6f}:{end:.6f}"))
+        indices = _sample_indices(frames, start, end)
+        selections.update(indices)
+        scene_shots.append({
+            "id": shot_id, "index": index, "start_s": start, "end_s": end,
+            "boundary_type": begin["type"], "frame_indices": indices,
+        })
+        for window_start, window_end in _analysis_windows(start, end):
+            indices = _sample_indices(frames, window_start, window_end)
+            selections.update(indices)
+            analysis.append({
+                "shot_id": shot_id, "shot_index": index,
+                "start_s": window_start, "end_s": window_end, "frame_indices": indices,
+            })
+    progress("抽取镜头关键帧", 0, len(selections))
+    extracted = _extract_selected_frames(proxy, folder, frames, sorted(selections))
+    for item in [*scene_shots, *analysis]:
+        item["keyframes"] = [extracted[i] for i in item.pop("frame_indices")]
+        if "id" in item:
+            item["thumbnail_key"] = item["keyframes"][len(item["keyframes"]) // 2]["key"]
+    progress("抽取镜头关键帧", len(selections), len(selections))
     audio_key = None
     if asset.has_audio:
         audio = folder / "audio.wav"
         run(
             [
-                settings.ffmpeg_bin,
-                "-y",
-                "-v",
-                "error",
-                "-i",
-                str(proxy),
-                "-vn",
-                "-ac",
-                "1",
-                "-ar",
-                "16000",
-                "-c:a",
-                "pcm_s16le",
-                str(audio),
+                settings.ffmpeg_bin, "-y", "-v", "error", "-i", str(proxy),
+                "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(audio),
             ]
         )
         audio_key = str(audio.relative_to(settings.data_dir.resolve()))
     return {
-        **asset.meta,
+        **(asset.meta or {}),
         "proxy_key": str(proxy.relative_to(settings.data_dir.resolve())),
-        "thumbnail_key": frames[0]["key"] if frames else None,
+        "thumbnail_key": scene_shots[0]["thumbnail_key"],
         "audio_key": audio_key,
-        "shots": shots,
-        "scene_boundaries": boundaries,
+        "scene_shots": scene_shots,
+        "shots": analysis,
+        "scene_boundaries": [item["time_s"] for item in boundaries],
+        "segmentation_version": SEGMENTATION_VERSION,
+        "segmentation": {
+            "method": "ffmpeg_rgb_scene_score_and_blackdetect",
+            "scene_threshold": SCENE_SCORE_THRESHOLD,
+            "limitations": "硬切自动检测；经过黑场的淡入淡出仅为候选。复杂叠化、快速摇镜和闪光可能漏检或误分。分析窗口不代表转场。",
+        },
         "time_mapping": "source_relative_seconds",
         "preview_duration_s": preview_meta["duration_s"],
-        "preprocessing_version": "frames-v1",
+        "preprocessing_version": SEGMENTATION_VERSION,
     }
 
 
 def dense_frames(asset, start, end):
+    """Bounded local review using real frame PTS, including subsecond shots."""
+    if not 0 <= start < end <= asset.duration_s:
+        raise ValueError("复核范围超出素材时间")
     folder = storage.path(asset.storage_key).parent / (
         "review-" + hashlib.sha256(f"{start}:{end}".encode()).hexdigest()[:12]
     )
     folder.mkdir(exist_ok=True)
-    run(
-        [
-            settings.ffmpeg_bin,
-            "-y",
-            "-v",
-            "error",
-            "-ss",
-            str(start),
-            "-i",
-            str(storage.path(asset.meta["proxy_key"])),
-            "-t",
-            str(end - start),
-            "-vf",
-            "fps=4,scale=640:-2",
-            "-q:v",
-            "3",
-            str(folder / "%04d.jpg"),
-        ]
-    )
-    return [
-        {
-            "time_s": round(start + i / 4, 3),
-            "key": str(f.relative_to(settings.data_dir.resolve())),
-        }
-        for i, f in enumerate(sorted(folder.glob("*.jpg")))
-        if start + i / 4 < end
-    ]
+    proxy = storage.path(asset.meta["proxy_key"])
+    frames, _ = _scan_frames(proxy)
+    selected = _sample_indices(frames, start, end)
+    extracted = _extract_selected_frames(proxy, folder, frames, selected)
+    return [extracted[index] for index in selected]

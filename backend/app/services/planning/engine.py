@@ -1,4 +1,5 @@
 from app.models import uid
+from app.services.diagnosis.vlog import select_key_evidence
 
 
 def select_budget(candidates, budget):
@@ -37,7 +38,8 @@ def plan_tasks(gaps, requirements, evidence, budget, demo=False):
         if gap["status"] in ("resolved", "dismissed") or gap["optional"]:
             continue
         req = reqs[gap["requirement_id"]]
-        references = [evs[e] for e in gap["evidence_ids"] if e in evs]
+        reference_ids = select_key_evidence(evidence, gap["evidence_ids"], limit=2)
+        references = [evs[e] for e in reference_ids]
         known = "；".join(
             dict.fromkeys(
                 s for e in references for s in e.get("subjects", []) if s != "unknown"
@@ -53,6 +55,9 @@ def plan_tasks(gaps, requirements, evidence, budget, demo=False):
             if gap["alternative_edit"]["feasible"]
             else [("import_existing", 3), ("reshoot", 15), ("generate", 8)]
         )
+        recommendation = gap.get("recommendation")
+        if recommendation:
+            options = [(recommendation["kind"], 5 if recommendation["kind"] == "reedit" else 15)]
         for kind, effort in options:
             instruction = {
                 "reedit": gap["alternative_edit"]["reason"],
@@ -65,6 +70,9 @@ def plan_tasks(gaps, requirements, evidence, budget, demo=False):
                 "关键表达没有被遮挡或截断",
                 "与参考素材的主体、场景连续性一致或有合理交代",
             ]
+            if recommendation:
+                instruction = recommendation["instruction"]
+                checks = recommendation["acceptance_checks"]
             tasks.append(
                 {
                     "id": uid(),
@@ -73,6 +81,8 @@ def plan_tasks(gaps, requirements, evidence, budget, demo=False):
                     "requirement_id": req["id"],
                     "requirement_description": req["description"],
                     "instruction": instruction,
+                    "anchor": gap.get("anchor"),
+                    "recommendation": recommendation,
                     "acceptance_checks": checks,
                     "prerequisites": ["先找到对应的已有素材"]
                     if kind == "import_existing"
@@ -87,8 +97,7 @@ def plan_tasks(gaps, requirements, evidence, budget, demo=False):
                     "prompt": f"镜头目的：{req['description']}。画面动作需清晰可见，建议 4—8 秒，景别以看清目标信息为准。{continuity} 不添加参考中没有依据的人物或环境细节。"
                     if kind == "generate"
                     else "",
-                    "reference_evidence_ids": gap["evidence_ids"]
-                    or [e["id"] for e in evidence[:2]],
+                    "reference_evidence_ids": reference_ids,
                     "reference_frames": [
                         {
                             "asset_id": e["asset_id"],
@@ -96,7 +105,7 @@ def plan_tasks(gaps, requirements, evidence, budget, demo=False):
                             "url": f"/api/v1/assets/{e['asset_id']}/frame?at={e['source_start_s']}",
                             "caption": e["action"],
                         }
-                        for e in (references or evidence[:2])
+                        for e in references
                         if e.get("evidence_type") != "audio"
                     ],
                     "needs_confirmation": gap["status"] != "confirmed"

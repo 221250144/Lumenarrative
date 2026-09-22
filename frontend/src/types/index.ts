@@ -14,6 +14,18 @@ export type Project = {
   cover_url?: string;
   constraints_json: { primary_asset_id?: string };
 };
+export type Shot = {
+  id: string;
+  asset_id: string;
+  index: number;
+  start_s: number;
+  end_s: number;
+  thumbnail_url?: string | null;
+  boundary_type: string;
+  summary?: string;
+  evidence_ids?: string[];
+  observed?: boolean;
+};
 export type Asset = {
   id: string;
   original_name: string;
@@ -28,6 +40,9 @@ export type Asset = {
   original_url: string;
   thumbnail_url: string | null;
   synthetic_media: boolean;
+  shots?: Shot[];
+  shot_count?: number;
+  segmentation_version?: string;
 };
 export type Job = {
   id: string;
@@ -46,6 +61,7 @@ export type Job = {
 };
 export type Evidence = {
   id: string;
+  shot_id?: string;
   asset_id: string;
   source_start_s: number;
   source_end_s: number;
@@ -76,6 +92,24 @@ export type Gap = {
   uncertain: boolean;
   optional: boolean;
   human_reason?: string;
+  anchor?: {
+    asset_id: string;
+    shot_id: string;
+    related_shot_id?: string;
+    start_s: number;
+    end_s: number;
+    insert_at_s: number;
+  };
+  impact?: string;
+  recommendation?: {
+    kind: "reshoot" | "reedit";
+    instruction: string;
+    shot_scale: string;
+    subject_action: string;
+    duration_s: number;
+    insert_position: "before" | "after" | "replace";
+    acceptance_checks: string[];
+  };
   searched_ranges: { asset_id: string; start_s: number; end_s: number }[];
   alternative_edit: { feasible: boolean; reason: string };
 };
@@ -101,6 +135,14 @@ export type Analysis = {
   };
 };
 export type Diagnosis = {
+  shots?: Shot[];
+  vlog?: {
+    summary: string;
+    vlog_type: string;
+    chapters: { title: string; shot_ids: string[]; summary: string }[];
+    primary_asset_id: string;
+    shot_count: number;
+  };
   analysis: Analysis;
   requirements: Requirement[];
   evidence: Evidence[];
@@ -127,6 +169,8 @@ export type Submission = {
   stale?: boolean;
 };
 export type Task = {
+  anchor?: Gap["anchor"];
+  recommendation?: Gap["recommendation"];
   id: string;
   type: string;
   instruction: string;

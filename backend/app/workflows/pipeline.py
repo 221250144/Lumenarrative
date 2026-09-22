@@ -22,7 +22,7 @@ from app.models import (
     serialize,
 )
 from app.providers.models import provider, CompatibleASR, PROMPT_VERSION
-from app.services.media.pipeline import preprocess, dense_frames
+from app.services.media.pipeline import preprocess, dense_frames, SEGMENTATION_VERSION
 from app.services.diagnosis.engine import (
     validate_evidence,
     merge_evidence,
@@ -44,6 +44,7 @@ def config_hash():
                 "window": settings.window_s,
                 "overlap": settings.overlap_s,
                 "fps": settings.sample_fps,
+                "segmentation": SEGMENTATION_VERSION,
             },
             sort_keys=True,
         ).encode()
@@ -56,11 +57,16 @@ def create_analysis(db, project):
     ).all()
     if not assets:
         raise ValueError("请先上传至少一个视频")
-    if any(a.status in ("queued", "processing") for a in assets):
+    analysis_assets = assets
+    if project.input_mode == "vlog":
+        analysis_assets = [a for a in assets if a.id == project.constraints_json.get("primary_asset_id")]
+        if not analysis_assets:
+            raise ValueError("请先指定一条主 Vlog")
+    if any(a.status in ("queued", "processing") for a in analysis_assets):
         raise ValueError("素材仍在预处理中，请完成后再分析")
-    if not any(a.status == "ready" for a in assets):
+    if not any(a.status == "ready" for a in analysis_assets):
         raise ValueError("没有成功预处理的素材")
-    if project.input_mode in ("rough_cut", "mixed"):
+    if project.input_mode in ("vlog", "rough_cut", "mixed"):
         primary = project.constraints_json.get("primary_asset_id")
         if not primary or not any(
             a.id == primary and a.status == "ready" for a in assets
@@ -114,8 +120,8 @@ def process_asset(job, progress):
             db.execute(
                 delete(TranscriptSegment).where(TranscriptSegment.asset_id == asset.id)
             )
-            for shot in asset.meta["shots"]:
-                db.add(Shot(asset_id=asset.id, project_id=asset.project_id, data=shot))
+            for shot in asset.meta["scene_shots"]:
+                db.add(Shot(id=shot["id"], asset_id=asset.id, project_id=asset.project_id, data=shot))
             for segment in transcripts:
                 db.add(
                     TranscriptSegment(
@@ -132,7 +138,8 @@ def process_asset(job, progress):
 
 def extract_asset(db, asset, run, model, progress):
     cache_key = hashlib.sha256(
-        (asset.project_id + asset.sha256 + run.config_hash).encode()
+        (asset.project_id + asset.id + asset.sha256 + run.config_hash
+         + json.dumps([(s.get("shot_id"), s["start_s"], s["end_s"]) for s in asset.meta.get("shots", [])])).encode()
     ).hexdigest()
     cached = asset.meta.get("evidence_cache", {})
     if cached.get("key") == cache_key and not cached.get("failed_ranges"):
@@ -147,6 +154,7 @@ def extract_asset(db, asset, run, model, progress):
                 raise ValueError("固定演示：模拟分段分析失败")
             for raw in model.analyze_clip(asset, shot):
                 item = validate_evidence(raw, asset.id, asset.duration_s, shot)
+                item["shot_id"] = shot.get("shot_id")
                 item["provenance"] = {
                     "provider": model.name,
                     "model": settings.vlm_model
@@ -240,6 +248,10 @@ def analyze(job, progress):
         db.commit()
         project = SimpleNamespace(**run.data["project_config"])
         model = provider()
+        if project.input_mode == "vlog":
+            from app.workflows.vlog import analyze_vlog
+            analyze_vlog(db, run, project, model, progress)
+            return
         progress("理解创作目标", 0, 1)
         requirements = project.constraints_json.get(
             "requirements"

@@ -6,19 +6,14 @@ import type {
   Evidence,
   Requirement,
   Gap,
+  Shot,
 } from "../types";
 import { Icon } from "../components/Icon";
-import { VideoPlayer } from "../components/VideoPlayer";
+import { VideoPlayer, type PlaybackRange } from "../components/VideoPlayer";
 import { time } from "../api/client";
+import { keyEvidence, preciseTime } from "../lib/evidence";
 
-const SOURCE_LABELS: Record<string, string> = {
-  real_capture: "实拍素材",
-  ai_generated: "AI 生成",
-  edited_video: "剪辑初稿",
-  insta360_export: "影石导出",
-  unknown: "未指定来源",
-};
-
+const PAGE_SIZE = 10;
 export function Workbench({
   project,
   assets,
@@ -45,43 +40,100 @@ export function Workbench({
   busy: boolean;
 }) {
   const [selected, setSelected] = useState("");
-  const [seek, setSeek] = useState<{ at: number; nonce: number }>();
-  const [source, setSource] = useState("real_capture");
+  const [seek, setSeek] = useState<PlaybackRange>();
   const [tab, setTab] = useState("gaps");
   const [intent, setIntent] = useState(project.intent);
   const [dragging, setDragging] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [shotPage, setShotPage] = useState(0);
+  const [findingPage, setFindingPage] = useState(0);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const playerRef = useRef<HTMLDivElement>(null);
+  const primary = assets.find(
+    (a) => a.id === project.constraints_json.primary_asset_id,
+  );
+  const active = assets.find((a) => a.id === selected) || primary;
+  const legacy = !!diagnosis && !diagnosis.vlog;
+  const diagnosisCurrent =
+    !!diagnosis?.vlog &&
+    !diagnosis.analysis.stale &&
+    diagnosis.vlog.primary_asset_id === primary?.id;
+  const shots = (
+    diagnosisCurrent && diagnosis.shots?.length
+      ? diagnosis.shots
+      : primary?.shots || []
+  )
+    .filter((shot) => shot.asset_id === primary?.id)
+    .slice()
+    .sort((a, b) => a.start_s - b.start_s);
   useEffect(() => {
     setIntent(project.intent);
   }, [project.id, project.intent]);
-  const active = assets.find((a) => a.id === selected) || assets[0];
-  const jump = (e: Evidence) => {
-    setSelected(e.asset_id);
-    setSeek({ at: e.source_start_s, nonce: Date.now() });
+  useEffect(() => {
+    setSelected("");
+    setSeek(undefined);
+    setShotPage(0);
+  }, [project.id, primary?.id]);
+  useEffect(() => {
+    setFindingPage(0);
+  }, [diagnosis?.analysis.id]);
+  useEffect(() => {
+    setShotPage(0);
+  }, [shots.length, diagnosis?.analysis.id]);
+  const jumpTo = (
+    assetId: string,
+    start: number,
+    end: number,
+    label: string,
+  ) => {
+    setSelected(assetId);
+    setSeek({ at: start, end, nonce: Date.now(), label });
+    playerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
+  const jump = (e: Evidence) =>
+    jumpTo(e.asset_id, e.source_start_s, e.source_end_s, "关键证据回看");
+  const jumpShot = (shot: Shot) =>
+    jumpTo(
+      shot.asset_id,
+      shot.start_s,
+      shot.end_s,
+      `镜头 ${shots.findIndex((item) => item.id === shot.id) + 1}`,
+    );
+  const cannotConclude =
+    !!diagnosis &&
+    (diagnosis.analysis.provider === "mock" ||
+      !diagnosis.analysis.coverage?.visual_complete ||
+      diagnosis.analysis.status !== "succeeded");
   const gaps = diagnosis?.gaps || [];
-  const necessary = gaps.filter(
-    (g) => !g.optional && g.status !== "dismissed" && g.status !== "resolved",
+  const actionable = gaps.filter(
+    (g) => !["dismissed", "resolved"].includes(g.status),
   );
-  const optional = gaps.filter((g) => g.optional);
-  const ready =
-    assets.length > 0 &&
-    assets.some((a) => a.status === "ready") &&
-    !assets.some((a) => ["queued", "processing"].includes(a.status));
+  const orderedGaps = [
+    ...actionable,
+    ...gaps.filter((g) => ["dismissed", "resolved"].includes(g.status)),
+  ];
+  const ready = project.input_mode === "vlog" && primary?.status === "ready";
+  const processed = assets.filter((a) => a.status === "ready");
+  const acceptUpload = (files: File[]) => {
+    if (busy) return;
+    if (files.length !== 1) {
+      setUploadError(
+        "请一次上传一条剪好的 Vlog。补拍片段请在“补拍与重剪”中添加。",
+      );
+      return;
+    }
+    setUploadError("");
+    onUpload(files, "edited_video");
+  };
   return (
     <>
       <div className="workspace-title">
         <div>
-          <span className="eyebrow">STORY WORKSPACE</span>
+          <span className="eyebrow">VLOG REVIEW WORKSPACE</span>
           <h1>{project.title}</h1>
           <p>
-            {project.input_mode === "clips"
-              ? "独立素材"
-              : project.input_mode === "rough_cut"
-                ? "剪辑初稿 · 保持原顺序"
-                : "初稿与素材 · 指定主初稿"}{" "}
-            <span> / </span> {project.style} <span> / </span> 目标{" "}
-            {project.target_duration_s} 秒
+            一条 Vlog，逐镜看清楚 <span>/</span> {project.style} <span>/</span>{" "}
+            目标 {time(project.target_duration_s)}
           </p>
         </div>
         <button
@@ -90,54 +142,82 @@ export function Workbench({
           onClick={onAnalyze}
         >
           <Icon name="spark" />
-          {diagnosis ? "重新诊断" : "开始叙事诊断"}
+          {diagnosis ? "重新按 Vlog 分析" : "分析这条 Vlog"}
         </button>
       </div>
       <div className="workflow-steps">
         {[
-          ["01", "整理素材", assets.length > 0],
-          ["02", "理解叙事", !!diagnosis],
-          ["03", "补全与修改", false],
-          ["04", "看见改变", false],
+          ["01", "上传 Vlog", !!primary],
+          ["02", "查看镜头切分", !!shots.length],
+          ["03", "定位具体问题", diagnosisCurrent],
+          ["04", "补拍或重剪", false],
         ].map(([n, label, done]) => (
           <div key={String(n)} className={done ? "step done" : "step"}>
             <span>{done ? <Icon name="check" size={13} /> : n}</span>
             {label}
           </div>
         ))}
-        <small>让创作意图贯穿每一步</small>
+        <small>每条建议只保留关键证据</small>
       </div>
-      {diagnosis?.analysis.stale && (
+      {project.input_mode !== "vlog" && (
         <div className="notice warning">
-          <Icon name="alert" />
-          素材或创作需求已更新。下面是历史诊断，请重新分析后再生成计划或粗剪。
+          <Icon name="film" />
+          <span>
+            这是旧版项目。请从已有视频中选一条剪好的 Vlog
+            作为主片，再开始分析。历史数据会保留。
+          </span>
         </div>
       )}
-      <div className="workbench-grid">
-        <aside className="asset-panel">
+      {diagnosis && (legacy || diagnosis.analysis.stale) && (
+        <div className="notice warning">
+          <Icon name="alert" />
+          <span>
+            {legacy
+              ? "旧版诊断：下方保留历史结果。选好主片后，重新按 Vlog 分析，获得逐镜定位的建议。"
+              : "主片或审看重点已更新。下方为历史结果，请重新分析后再生成计划或导出。"}
+          </span>
+        </div>
+      )}
+      <div className="workbench-grid vlog-workbench">
+        <aside className="asset-panel vlog-source-panel">
           <div className="panel-title">
             <h3>
-              素材库 <span>{assets.length}</span>
+              <Icon name="film" />主 Vlog
             </h3>
-            <button
-              className="icon-button"
-              title="上传素材"
-              disabled={busy}
-              onClick={() => uploadRef.current?.click()}
-            >
-              <Icon name="plus" />
-            </button>
+            <span>每次审看一条</span>
           </div>
-          <label className="source-select">
-            素材来源
-            <select value={source} onChange={(e) => setSource(e.target.value)}>
-              {Object.entries(SOURCE_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {primary && (
+            <div className="primary-vlog">
+              <button
+                className="primary-preview"
+                onClick={() => {
+                  setSelected(primary.id);
+                  setSeek(undefined);
+                }}
+              >
+                {primary.thumbnail_url ? (
+                  <img src={primary.thumbnail_url} alt="主 Vlog 封面" />
+                ) : (
+                  <Icon name="film" size={30} />
+                )}
+                <span className="mono">{time(primary.duration_s)}</span>
+              </button>
+              <strong title={primary.original_name}>
+                {primary.original_name}
+              </strong>
+              <p>
+                <span className={primary.status === "ready" ? "ready" : "dim"}>
+                  {primary.status === "ready"
+                    ? "已就绪"
+                    : primary.status === "failed"
+                      ? "处理失败"
+                      : "正在检测镜头切点…"}
+                </span>
+                {primary.shot_count ? ` · ${primary.shot_count} 个镜头` : ""}
+              </p>
+              {primary.synthetic_media && <small>程序生成的演示视频</small>}
+            </div>
+          )}
           <div
             className={"dropzone " + (dragging ? "dragging" : "")}
             onDragOver={(e) => {
@@ -148,13 +228,17 @@ export function Workbench({
             onDrop={(e) => {
               e.preventDefault();
               setDragging(false);
-              if (!busy) onUpload(Array.from(e.dataTransfer.files), source);
+              acceptUpload(Array.from(e.dataTransfer.files));
             }}
           >
             <button disabled={busy} onClick={() => uploadRef.current?.click()}>
               <Icon name="upload" size={23} />
-              <strong>添加你的镜头</strong>
-              <span>拖放视频或点击上传</span>
+              <strong>
+                {primary ? "上传另一版 Vlog" : "上传一条剪好的 Vlog"}
+              </strong>
+              <span>
+                {primary ? "上传后选择设为主片" : "拖放一个视频或点击上传"}
+              </span>
               <small>MP4 / MOV / WebM / MKV / AVI</small>
             </button>
           </div>
@@ -162,162 +246,228 @@ export function Workbench({
             ref={uploadRef}
             type="file"
             hidden
-            multiple
             accept="video/*,.mkv,.avi"
             onChange={(e) => {
-              if (e.target.files) onUpload(Array.from(e.target.files), source);
+              if (e.target.files?.length)
+                acceptUpload(Array.from(e.target.files));
               e.target.value = "";
             }}
           />
-          <div className="asset-list">
-            {assets.map((asset, i) => (
-              <div
-                key={asset.id}
-                className={
-                  "asset-item " + (active?.id === asset.id ? "selected" : "")
-                }
+          {uploadError && (
+            <p className="source-error" role="alert">
+              {uploadError}
+            </p>
+          )}
+          {(assets.length > 1 || !primary || project.input_mode !== "vlog") && (
+            <div className="primary-picker">
+              <label htmlFor="primary-vlog-select">
+                {primary ? "更换要审看的主片" : "选择已有 Vlog"}
+              </label>
+              <select
+                id="primary-vlog-select"
+                disabled={busy || !processed.length}
+                value={project.input_mode === "vlog" ? primary?.id || "" : ""}
+                onChange={(e) => {
+                  if (e.target.value) onPrimary(e.target.value);
+                }}
               >
-                <button
-                  onClick={() => {
-                    setSelected(asset.id);
-                    setSeek(undefined);
-                  }}
-                >
-                  <div className="asset-thumb">
-                    {asset.thumbnail_url ? (
-                      <img src={asset.thumbnail_url} alt="" />
-                    ) : (
-                      <Icon name="film" />
-                    )}
-                    <span className="mono">{time(asset.duration_s)}</span>
-                  </div>
-                  <div className="asset-name">
-                    <span className="asset-index">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <strong title={asset.original_name}>
-                      {asset.original_name}
-                    </strong>
-                  </div>
-                  <div className="asset-caption">
+                <option value="">请选择一条剪好的 Vlog</option>
+                {processed.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.original_name} · {time(a.duration_s)}
+                  </option>
+                ))}
+              </select>
+              <small>只分析所选主片。补充片段在修改任务中单独使用。</small>
+            </div>
+          )}
+          {!!assets.filter((a) => a.id !== primary?.id && a.status !== "ready")
+            .length && (
+            <div className="source-processing">
+              {assets
+                .filter((a) => a.id !== primary?.id && a.status !== "ready")
+                .map((a) => (
+                  <p key={a.id}>
+                    {a.original_name}
                     <span>
-                      {asset.synthetic_media
-                        ? "演示分镜"
-                        : SOURCE_LABELS[asset.source_type]}
+                      {a.status === "failed"
+                        ? "处理失败，请查看任务提示"
+                        : "视频处理中…"}
                     </span>
-                    <span
-                      className={asset.status === "ready" ? "ready" : "dim"}
-                    >
-                      {asset.status === "ready"
-                        ? "已就绪"
-                        : asset.status === "failed"
-                          ? "处理失败"
-                          : "处理中"}
-                    </span>
-                  </div>
-                </button>
-                {project.input_mode !== "clips" && (
-                  <button
-                    className="primary-select"
-                    disabled={busy || asset.status !== "ready"}
-                    onClick={() => onPrimary(asset.id)}
-                  >
-                    {project.constraints_json.primary_asset_id === asset.id
-                      ? "✓ 当前剪辑初稿"
-                      : "设为剪辑初稿"}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="library-footer">
-            <Icon name="folder" size={14} />
-            {assets.length} 个素材 ·{" "}
-            {time(assets.reduce((n, a) => n + a.duration_s, 0))}
-            <span>本地保存</span>
-          </div>
-        </aside>
-        <main className="preview-column">
-          <VideoPlayer asset={active} seek={seek} />
-          <section className="intent-card">
+                  </p>
+                ))}
+            </div>
+          )}
+          <section className="intent-card vlog-intent">
             <div className="panel-title">
               <h3>
-                <Icon name="sun" /> 创作意图
+                <Icon name="sun" />
+                审看重点
               </h3>
-              <span>故事的起点</span>
             </div>
             <textarea
-              aria-label="创作意图"
+              aria-label="审看重点"
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
-              rows={3}
+              rows={5}
             />
             <div className="intent-footer">
-              <span>每一条诊断，都以你的表达目标为依据。</span>
+              <span>写下你担心的衔接或表达问题。</span>
               {intent !== project.intent && (
                 <button
                   disabled={busy || !intent.trim()}
                   className="small-button"
                   onClick={() => onIntent(intent)}
                 >
-                  保存意图
+                  保存
                 </button>
               )}
             </div>
           </section>
-          <section className="evidence-section">
+          <div className="library-footer">
+            <Icon name="folder" size={14} />
+            {Math.max(0, assets.length - (primary ? 1 : 0))} 条其他素材已保留
+          </div>
+        </aside>
+        <div className="preview-column">
+          <div ref={playerRef}>
+            <VideoPlayer
+              asset={active}
+              seek={seek}
+              onClearRange={() => setSeek(undefined)}
+            />
+          </div>
+          <section className="shot-section">
             <div className="panel-title">
               <h3>
-                镜头里的线索 <span>{diagnosis?.evidence.length || 0}</span>
+                <Icon name="layers" />
+                镜头切分 <span>{shots.length}</span>
               </h3>
-              <span>点击回看原片</span>
+              <span>按原片顺序 · 点击回看</span>
             </div>
-            {diagnosis?.evidence.length ? (
-              <div className="evidence-list">
-                {diagnosis.evidence.map((e, i) => (
-                  <button
-                    className="evidence-row"
-                    key={e.id}
-                    onClick={() => jump(e)}
-                  >
-                    <span className="evidence-num mono">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <div>
-                      <strong>{e.action}</strong>
-                      <p>
-                        {e.quality_issues.length
-                          ? e.quality_issues.join(" · ")
-                          : e.evidence_type === "audio"
-                            ? "对白证据"
-                            : "画面证据"}
-                        {e.provenance.demo ? " · 固定演示标注" : ""}
-                      </p>
-                    </div>
-                    <span className="time-pill mono">
-                      <Icon name="play" size={10} />
-                      {time(e.source_start_s)}
-                    </span>
-                  </button>
-                ))}
-              </div>
+            {!!shots.length && (
+              <p className="shot-explanation">
+                按转场和画面变化自动检测切点，连续长镜头保留完整。切点供审看参考，原视频不会被改动。
+              </p>
+            )}
+            {shots.length ? (
+              <>
+                {diagnosisCurrent && !!diagnosis.vlog?.chapters.length && (
+                  <div className="vlog-chapters">
+                    {diagnosis.vlog.chapters.map((chapter, i) => (
+                      <button
+                        className="chapter-chip"
+                        key={`${chapter.title}-${i}`}
+                        title={chapter.summary}
+                        onClick={() => {
+                          const index = shots.findIndex((shot) =>
+                            chapter.shot_ids.includes(shot.id),
+                          );
+                          if (index >= 0) {
+                            setShotPage(Math.floor(index / PAGE_SIZE));
+                            jumpShot(shots[index]);
+                          }
+                        }}
+                      >
+                        {String(i + 1).padStart(2, "0")} {chapter.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="shot-list">
+                  {shots
+                    .slice(shotPage * PAGE_SIZE, (shotPage + 1) * PAGE_SIZE)
+                    .map((shot, i) => (
+                      <button
+                        className={
+                          "shot-row " +
+                          (active?.id === shot.asset_id &&
+                          seek?.at === shot.start_s &&
+                          seek.end === shot.end_s
+                            ? "selected"
+                            : "")
+                        }
+                        key={shot.id}
+                        onClick={() => jumpShot(shot)}
+                      >
+                        <div className="shot-thumbnail">
+                          {shot.thumbnail_url ? (
+                            <img
+                              src={shot.thumbnail_url}
+                              alt=""
+                              loading="lazy"
+                            />
+                          ) : (
+                            <Icon name="film" />
+                          )}
+                          <span>
+                            {String(shotPage * PAGE_SIZE + i + 1).padStart(
+                              2,
+                              "0",
+                            )}
+                          </span>
+                        </div>
+                        <div className="shot-copy">
+                          <strong>
+                            {shot.summary ||
+                              (shot.observed === false
+                                ? "这个镜头尚未完成画面理解"
+                                : `镜头 ${shotPage * PAGE_SIZE + i + 1}`)}
+                          </strong>
+                          <span className="mono">
+                            {preciseTime(shot.start_s)} —{" "}
+                            {preciseTime(shot.end_s)}{" "}
+                            <small>
+                              {(shot.end_s - shot.start_s).toFixed(1)} 秒
+                            </small>
+                          </span>
+                          <small>
+                            {shot.boundary_type === "start"
+                              ? "原片开头"
+                              : shot.boundary_type === "fade_candidate"
+                                ? "渐变转场候选 · 请回看核实"
+                                : "画面切换"}
+                            {shot.observed === false ? " · 待核实" : ""}
+                          </small>
+                        </div>
+                        <Icon name="play" size={15} />
+                      </button>
+                    ))}
+                </div>
+                {shots.length > PAGE_SIZE && (
+                  <Pagination
+                    page={shotPage}
+                    total={shots.length}
+                    size={PAGE_SIZE}
+                    onPage={setShotPage}
+                    noun="镜头"
+                  />
+                )}
+              </>
             ) : (
               <div className="inline-empty">
-                完成诊断后，这里会出现带时间点的素材证据。
+                {!primary
+                  ? "先上传或选择一条 Vlog，处理完成后会按原片顺序展示镜头。"
+                  : primary.status !== "ready"
+                    ? "正在读取视频并检测转场，处理完成后自动展示镜头。"
+                    : "这条视频还没有新版切分结果。点击“分析这条 Vlog”，生成镜头切分与具体建议。"}
               </div>
             )}
           </section>
-        </main>
-        <aside className="diagnosis-panel">
+        </div>
+        <aside className="diagnosis-panel vlog-diagnosis">
           <div className="panel-title">
             <h3>
-              <Icon name="spark" /> 叙事诊断
+              <Icon name="spark" />
+              具体修改建议
             </h3>
             {diagnosis && (
               <span className="badge">
-                {diagnosis.analysis.provider === "mock"
-                  ? "演示数据"
-                  : "模型分析"}
+                {legacy
+                  ? "历史结果"
+                  : diagnosis.analysis.provider === "mock"
+                    ? "演示数据"
+                    : "Vlog 审看"}
               </span>
             )}
           </div>
@@ -326,13 +476,14 @@ export function Workbench({
               className={tab === "gaps" ? "active" : ""}
               onClick={() => setTab("gaps")}
             >
-              表达缺口 {necessary.length > 0 && <span>{necessary.length}</span>}
+              补拍与重剪{" "}
+              {actionable.length > 0 && <span>{actionable.length}</span>}
             </button>
             <button
               className={tab === "requirements" ? "active" : ""}
               onClick={() => setTab("requirements")}
             >
-              创作需求
+              审看依据
             </button>
           </div>
           {!diagnosis ? (
@@ -340,22 +491,22 @@ export function Workbench({
               <div className="empty-spark">
                 <Icon name="spark" size={32} />
               </div>
-              <h3>先理解，再补全。</h3>
+              <h3>具体到某一秒、某一镜。</h3>
               <p>
-                上传镜头并写下创作意图，
+                先上传一条 Vlog，查看镜头切分，
                 <br />
-                让我们一起看看故事哪里
+                再分析换地点、动作跳跃、
                 <br />
-                还可以表达得更清楚。
+                结果交代等具体问题。
               </p>
               <div className="principle">
-                <Icon name="check" size={14} /> 优先利用已有素材
+                <Icon name="check" size={14} /> 每次最多 5 条优先建议
               </div>
               <div className="principle">
-                <Icon name="check" size={14} /> 每个判断都有依据
+                <Icon name="check" size={14} /> 每条最多 2 段关键证据
               </div>
               <div className="principle">
-                <Icon name="check" size={14} /> 无需补充，也是好结果
+                <Icon name="check" size={14} /> 说清补拍什么，插在哪里
               </div>
             </div>
           ) : tab === "requirements" ? (
@@ -364,94 +515,112 @@ export function Workbench({
                 <RequirementCard
                   key={r.id}
                   requirement={r}
-                  disabled={busy || diagnosis.analysis.stale}
+                  disabled={busy || !diagnosisCurrent}
                   save={(data) => onRequirement(r.id, data)}
                 />
               ))}
             </div>
           ) : (
             <>
+              {diagnosis.vlog && (
+                <div className="vlog-overview">
+                  <span className="eyebrow">
+                    {diagnosis.vlog.vlog_type || "VLOG"}
+                  </span>
+                  <p>{diagnosis.vlog.summary}</p>
+                </div>
+              )}
               <div className="diagnosis-summary">
                 <div
                   className={
-                    "summary-icon " + (necessary.length ? "" : "clear")
+                    "summary-icon " +
+                    (actionable.length || cannotConclude ? "" : "clear")
                   }
                 >
-                  <Icon name={necessary.length ? "eye" : "check"} size={23} />
+                  <Icon
+                    name={actionable.length || cannotConclude ? "eye" : "check"}
+                    size={23}
+                  />
                 </div>
                 <div>
                   <strong>
-                    {necessary.length
-                      ? `${necessary.length} 处表达值得再看一眼`
-                      : "当前没有必要补充的镜头"}
+                    {actionable.length
+                      ? `${actionable.length} 处值得修改或核实`
+                      : cannotConclude
+                        ? "当前信息还不足以下结论"
+                        : "暂未发现需要补拍的问题"}
                   </strong>
                   <p>
-                    {necessary.length
-                      ? "先核实问题，再决定怎么修改。"
-                      : "已有素材支持当前目标，仍可人工审看。"}
+                    {legacy
+                      ? "旧版结果可回看，建议重新分析。"
+                      : actionable.length
+                        ? "先回看对应镜头，再决定是否采用。"
+                        : cannotConclude
+                          ? "演示结果或不完整的画面分析，不能确认这条 Vlog 是否还需补拍。"
+                          : primary?.has_audio
+                            ? "当前画面未发现必要缺口；可结合对白继续人工审看。"
+                            : "当前画面未发现必要缺口；可继续回看切点和画面节奏。"}
                   </p>
                 </div>
               </div>
               <div className="gap-list">
-                {gaps
-                  .filter((g) => !g.optional)
+                {orderedGaps
+                  .slice(findingPage * 5, (findingPage + 1) * 5)
                   .map((g) => (
                     <GapCard
                       key={g.id}
                       gap={g}
                       evidence={diagnosis.evidence}
+                      shots={diagnosis.shots || []}
                       jump={jump}
+                      jumpTo={jumpTo}
                       onChange={onGap}
-                      disabled={busy || diagnosis.analysis.stale}
+                      disabled={busy || !diagnosisCurrent}
                     />
                   ))}
-                {optional.length > 0 && (
-                  <div className="optional-heading">
-                    可选丰富 · 不影响必要任务
-                  </div>
-                )}
-                {optional.map((g) => (
-                  <GapCard
-                    key={g.id}
-                    gap={g}
-                    evidence={diagnosis.evidence}
-                    jump={jump}
-                    onChange={onGap}
-                    disabled={busy || diagnosis.analysis.stale}
-                  />
-                ))}
               </div>
+              {orderedGaps.length > 5 && (
+                <Pagination
+                  page={findingPage}
+                  total={orderedGaps.length}
+                  size={5}
+                  onPage={setFindingPage}
+                  noun="历史建议"
+                />
+              )}
               {diagnosis.analysis.coverage && (
                 <div className="coverage-note">
                   <Icon name="eye" size={14} />
                   <div>
-                    已检索 {diagnosis.analysis.coverage.ranges.length} 个素材
-                    {!diagnosis.analysis.coverage.visual_complete
-                      ? " · 存在分析失败范围"
-                      : ""}
+                    {diagnosis.analysis.coverage.visual_complete
+                      ? "画面分析已完成"
+                      : "部分画面未完成分析，结论需要复核"}
                     {!diagnosis.analysis.coverage.audio_complete
-                      ? " · 音频覆盖不完整"
+                      ? " · 对白信息尚未完整核实"
                       : ""}
-                    <small>{diagnosis.analysis.coverage.sampling_note}</small>
-                    {diagnosis.analysis.coverage.failed_ranges.map((f, i) => (
-                      <small className="warning-text" key={i}>
-                        {f.reason}
-                      </small>
-                    ))}
+                    <details>
+                      <summary>查看分析范围</summary>
+                      <small>{diagnosis.analysis.coverage.sampling_note}</small>
+                      {diagnosis.analysis.coverage.failed_ranges
+                        .slice(0, 3)
+                        .map((f, i) => (
+                          <small className="warning-text" key={i}>
+                            {f.reason}
+                          </small>
+                        ))}
+                    </details>
                   </div>
                 </div>
               )}
               <div className="diagnosis-bottom">
                 <button
                   className="primary full-width"
-                  disabled={
-                    busy || diagnosis.analysis.stale || !necessary.length
-                  }
+                  disabled={busy || !diagnosisCurrent || !actionable.length}
                   onClick={onPlan}
                 >
-                  制定补全与修改计划 <Icon name="arrow" />
+                  生成补拍与重剪清单 <Icon name="arrow" />
                 </button>
-                <small>未确认的问题，会保留为待确认任务。</small>
+                <small>未确认的意见会保留为待核实任务。</small>
               </div>
             </>
           )}
@@ -461,6 +630,48 @@ export function Workbench({
   );
 }
 
+function Pagination({
+  page,
+  total,
+  size,
+  onPage,
+  noun,
+}: {
+  page: number;
+  total: number;
+  size: number;
+  onPage: (page: number) => void;
+  noun: string;
+}) {
+  return (
+    <div className="shot-pagination">
+      <span>
+        {page * size + 1}–{Math.min((page + 1) * size, total)} / {total} 个
+        {noun}
+      </span>
+      <div>
+        <button
+          className="small-button"
+          disabled={page === 0}
+          onClick={() => onPage(page - 1)}
+          aria-label={`上一页${noun}`}
+        >
+          <Icon name="back" size={13} />
+          上一页
+        </button>
+        <button
+          className="small-button"
+          disabled={(page + 1) * size >= total}
+          onClick={() => onPage(page + 1)}
+          aria-label={`下一页${noun}`}
+        >
+          下一页
+          <Icon name="arrow" size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
 function RequirementCard({
   requirement: r,
   disabled,
@@ -536,24 +747,32 @@ function RequirementCard({
 function GapCard({
   gap: g,
   evidence,
+  shots,
   jump,
+  jumpTo,
   onChange,
   disabled,
 }: {
   gap: Gap;
   evidence: Evidence[];
+  shots: Shot[];
   jump: (e: Evidence) => void;
+  jumpTo: (asset: string, start: number, end: number, label: string) => void;
   onChange: (id: string, status: string, reason: string) => void;
   disabled: boolean;
 }) {
   const [reason, setReason] = useState("");
+  const selectedEvidence = keyEvidence(g.evidence_ids, evidence);
+  const originalCount = new Set(
+    g.evidence_ids.filter((id) => evidence.some((e) => e.id === id)),
+  ).size;
+  const shotIndex = shots.findIndex((shot) => shot.id === g.anchor?.shot_id);
+  const recommendation = g.recommendation;
   return (
     <article
       className={
         "gap-card " +
-        (g.status === "dismissed" || g.status === "resolved"
-          ? "muted-card"
-          : "")
+        (["dismissed", "resolved"].includes(g.status) ? "muted-card" : "")
       }
     >
       <div className="gap-top">
@@ -571,33 +790,125 @@ function GapCard({
                     : "待确认"}
         </span>
         <span className="dim">
-          {g.type === "missing_content"
-            ? "内容缺失"
-            : g.type === "transition_issue"
-              ? "镜头衔接"
-              : "表达不足"}
+          {recommendation?.kind === "reedit"
+            ? "重剪"
+            : recommendation?.kind === "reshoot"
+              ? "补拍"
+              : g.type === "transition_issue"
+                ? "镜头衔接"
+                : "画面表达"}
         </span>
       </div>
       <h4>{g.description}</h4>
-      <p>{g.reason}</p>
-      {g.evidence_ids
-        .map((id) => evidence.find((e) => e.id === id))
-        .filter((e): e is Evidence => !!e)
-        .map((e) => (
-          <button className="evidence-link" key={e.id} onClick={() => jump(e)}>
-            <Icon name="play" size={11} />
-            查看依据{" "}
-            <span className="mono">
-              {time(e.source_start_s)} — {time(e.source_end_s)}
-            </span>
-          </button>
-        ))}
-      {!g.evidence_ids.length && (
+      {g.anchor && (
+        <button
+          className="finding-anchor"
+          onClick={() =>
+            jumpTo(
+              g.anchor!.asset_id,
+              g.anchor!.start_s,
+              g.anchor!.end_s,
+              "问题位置回看",
+            )
+          }
+        >
+          <Icon name="play" size={12} />
+          <span>
+            {shotIndex >= 0 ? `镜头 ${shotIndex + 1} · ` : "原片位置 · "}
+            {preciseTime(g.anchor.start_s)}–{preciseTime(g.anchor.end_s)}
+          </span>
+        </button>
+      )}
+      <div className="finding-detail">
+        <span>观察到什么</span>
+        <p>{g.reason}</p>
+      </div>
+      {g.impact && (
+        <div className="finding-detail">
+          <span>哪里不清楚</span>
+          <p>{g.impact}</p>
+        </div>
+      )}
+      {recommendation && (
+        <div className="recommendation-box">
+          <strong>
+            <Icon
+              name={recommendation.kind === "reedit" ? "layers" : "film"}
+              size={14}
+            />
+            {recommendation.kind === "reedit" ? "建议这样剪" : "建议补拍这一镜"}
+          </strong>
+          <p>{recommendation.instruction}</p>
+          <div className="recommendation-meta">
+            {recommendation.shot_scale && (
+              <span>{recommendation.shot_scale}</span>
+            )}
+            {recommendation.duration_s > 0 && (
+              <span>{recommendation.duration_s} 秒</span>
+            )}
+            {g.anchor && (
+              <span>
+                {recommendation.insert_position === "replace"
+                  ? "替换"
+                  : recommendation.insert_position === "before"
+                    ? "插在之前"
+                    : "插在之后"}{" "}
+                · {preciseTime(g.anchor.insert_at_s)}
+              </span>
+            )}
+          </div>
+          {recommendation.subject_action && (
+            <p className="subject-action">
+              画面内容：{recommendation.subject_action}
+            </p>
+          )}
+          {!!recommendation.acceptance_checks.length && (
+            <details>
+              <summary>拍到怎样算完成</summary>
+              <ul>
+                {recommendation.acceptance_checks
+                  .slice(0, 4)
+                  .map((check, i) => (
+                    <li key={i}>{check}</li>
+                  ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+      {!!selectedEvidence.length && (
+        <div className="key-evidence">
+          <span>关键证据</span>
+          {selectedEvidence.map((e, i) => (
+            <button
+              className="evidence-link"
+              key={e.id}
+              onClick={() => jump(e)}
+              title={e.action}
+            >
+              <Icon name="play" size={11} />
+              <span>
+                {i + 1}. {e.action}
+              </span>
+              <small className="mono">
+                {preciseTime(e.source_start_s)}–{preciseTime(e.source_end_s)}
+              </small>
+            </button>
+          ))}
+          {originalCount > selectedEvidence.length && (
+            <small>
+              已合并重复范围，仅显示 {selectedEvidence.length} 段关键证据（原有{" "}
+              {originalCount} 条）。
+            </small>
+          )}
+        </div>
+      )}
+      {!selectedEvidence.length && (
         <span className="searched-label">
-          检索范围：{g.searched_ranges.length} 个素材，未获得直接支持证据
+          未取得可回看的直接证据，此意见需要人工核实。
         </span>
       )}
-      {g.alternative_edit.feasible && (
+      {!recommendation && g.alternative_edit.feasible && (
         <div className="reedit-hint">
           <Icon name="layers" size={14} />
           可优先重剪：{g.alternative_edit.reason}
@@ -618,7 +929,7 @@ function GapCard({
               onClick={() => onChange(g.id, "confirmed", reason)}
             >
               <Icon name="check" size={13} />
-              确实需要修改
+              采用这条建议
             </button>
             <button
               disabled={disabled}

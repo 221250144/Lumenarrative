@@ -2,20 +2,35 @@ import { useEffect, useRef } from "react";
 import type { Asset } from "../types";
 import { Icon } from "./Icon";
 import { time } from "../api/client";
+import { preciseTime } from "../lib/evidence";
+
+export type PlaybackRange = {
+  at: number;
+  end?: number;
+  nonce: number;
+  label?: string;
+};
 
 export function VideoPlayer({
   asset,
   seek,
+  onClearRange,
 }: {
   asset?: Asset;
-  seek?: { at: number; nonce: number };
+  seek?: PlaybackRange;
+  onClearRange?: () => void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
+  const range = useRef(seek);
+  range.current = seek;
   useEffect(() => {
     const element = video.current;
     if (!element || !seek) return;
     const jump = () => {
-      element.currentTime = seek.at;
+      element.currentTime = Math.max(
+        0,
+        Math.min(seek.at, element.duration || seek.at),
+      );
       void element.play().catch(() => {});
     };
     if (element.readyState >= 1) jump();
@@ -24,14 +39,57 @@ export function VideoPlayer({
       return () => element.removeEventListener("loadedmetadata", jump);
     }
   }, [seek, asset?.id]);
+  useEffect(() => {
+    const element = video.current;
+    if (!element) return;
+    let frame = 0;
+    const constrain = () => {
+      const current = range.current;
+      if (current?.end !== undefined) {
+        // Source ranges have an exclusive out point: keep the preceding frame
+        // visible instead of seeking into the next shot at the cut.
+        const stopAt =
+          current.end - Math.min(0.025, (current.end - current.at) / 4);
+        if (element.currentTime >= stopAt) {
+          element.pause();
+          if (element.currentTime > stopAt) element.currentTime = stopAt;
+        }
+      }
+    };
+    const tick = () => {
+      constrain();
+      if (!element.paused) frame = requestAnimationFrame(tick);
+    };
+    const start = () => {
+      const current = range.current;
+      if (
+        current?.end !== undefined &&
+        (element.currentTime >= current.end - 0.05 ||
+          element.currentTime < current.at)
+      )
+        element.currentTime = current.at;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(tick);
+    };
+    element.addEventListener("play", start);
+    element.addEventListener("timeupdate", constrain);
+    return () => {
+      cancelAnimationFrame(frame);
+      element.removeEventListener("play", start);
+      element.removeEventListener("timeupdate", constrain);
+    };
+  }, [asset?.id, asset?.preview_url]);
   return (
     <div className="player-shell">
       <div className="player-heading">
         <span>
-          <i className="live-dot" /> 原片预览
+          <i className="live-dot" />{" "}
+          {seek?.end !== undefined
+            ? seek.label || "关键片段回看"
+            : "Vlog 原片预览"}
         </span>
         <span className="mono">
-          {asset ? `${asset.width} × ${asset.height}` : "SOURCE VIEW"}
+          {asset ? `${asset.width} × ${asset.height}` : "VLOG PREVIEW"}
         </span>
       </div>
       <div className="video-stage">
@@ -48,15 +106,33 @@ export function VideoPlayer({
         ) : (
           <div className="player-empty">
             <Icon name="film" size={38} />
-            <p>{asset ? "正在准备可播放的视频" : "从左侧选择一个镜头"}</p>
-            <small>证据中的时间点会带你回到这里</small>
+            <p>{asset ? "正在准备可播放的视频" : "上传或选择一条 Vlog"}</p>
+            <small>镜头和建议都可以在这里回看</small>
           </div>
         )}
       </div>
+      {seek?.end !== undefined && (
+        <div className="playback-range" role="status">
+          <span className="mono">
+            {preciseTime(seek.at)} — {preciseTime(seek.end)}{" "}
+            <span>播至片段末尾自动暂停</span>
+          </span>
+          <button
+            className="small-button"
+            onClick={() => {
+              range.current = undefined;
+              onClearRange?.();
+              void video.current?.play().catch(() => {});
+            }}
+          >
+            继续看全片
+          </button>
+        </div>
+      )}
       <div className="player-footer">
         <div>
           <Icon name="film" />
-          <span>{asset?.original_name || "等待素材"}</span>
+          <span>{asset?.original_name || "等待 Vlog"}</span>
         </div>
         <span className="mono">{asset ? time(asset.duration_s) : "00:00"}</span>
       </div>
@@ -68,8 +144,8 @@ export function VideoPlayer({
             : asset.audio_status === "analyzed"
               ? "音频已转写"
               : asset.audio_status === "failed"
-                ? "音频分析失败 · 诊断会保留不确定性"
-                : "音频未分析 · 尚未配置转写服务"}
+                ? "音频分析失败 · 保留对白信息的不确定性"
+                : "尚未分析对白 · 画面未呈现的内容可能已由声音交代"}
           {asset.synthetic_media && <span>程序生成的演示分镜卡</span>}
         </div>
       )}

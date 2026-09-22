@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Project, Asset, Plan, Task } from "../types";
 import { Icon } from "../components/Icon";
+import { keyEvidence, preciseTime } from "../lib/evidence";
 
 const labels: Record<string, string> = {
   reedit: "重剪现有素材",
@@ -54,8 +55,8 @@ export function Tasks({
       <div className="workspace-title">
         <div>
           <span className="eyebrow">MAKE EVERY SHOT COUNT</span>
-          <h1>补全与修改计划</h1>
-          <p>优先用已有镜头解决问题，把精力留给最值得补充的一镜。</p>
+          <h1>Vlog 补拍与重剪清单</h1>
+          <p>对照主 Vlog 中的具体位置补拍，再上传片段检查是否解决问题。</p>
         </div>
         <div className="budget-control">
           <label>
@@ -123,7 +124,9 @@ export function Tasks({
           ["selected", "推荐执行"],
           ["reedit", "重剪"],
           ["reshoot", "补拍"],
-          ["generate", "AI 生成"],
+          ...(plan?.tasks.some((task) => task.type === "generate")
+            ? [["generate", "历史生成方案"]]
+            : []),
         ].map(([key, label]) => (
           <button
             className={filter === key ? "active" : ""}
@@ -141,7 +144,10 @@ export function Tasks({
               key={t.id}
               task={t}
               index={i}
-              assets={assets}
+              assets={assets.filter(
+                (asset) =>
+                  asset.id !== project.constraints_json.primary_asset_id,
+              )}
               busy={busy}
               isDemo={!!project.demo_scenario}
               onSubmit={onSubmit}
@@ -155,11 +161,11 @@ export function Tasks({
       ) : (
         <div className="large-empty">
           <Icon name="layers" size={40} />
-          <h3>{plan ? "当前筛选下没有任务" : "先听听镜头在说什么"}</h3>
+          <h3>{plan ? "当前筛选下没有任务" : "先审看你的 Vlog"}</h3>
           <p>
             {plan
-              ? "无需补充时，可以直接生成粗剪审看。"
-              : "完成诊断并核实问题后，在这里生成可执行的修改计划。"}
+              ? "无需补拍时，可在“版本与导出”中审看现有 Vlog。"
+              : "先在“Vlog 审看”中完成分镜分析并核实建议，再生成具体清单。"}
           </p>
         </div>
       )}
@@ -222,7 +228,43 @@ function TaskCard({
         </span>
       </div>
       <h4>{t.requirement_description}</h4>
-      <p>{t.instruction}</p>
+      {t.anchor && (
+        <div className="task-anchor mono">
+          <Icon name="film" size={13} />主 Vlog ·{" "}
+          {preciseTime(t.anchor.start_s)}–{preciseTime(t.anchor.end_s)}
+        </div>
+      )}
+      <p>{t.recommendation?.instruction || t.instruction}</p>
+      {t.recommendation && (
+        <div className="recommendation-box">
+          <strong>
+            {t.recommendation.kind === "reedit"
+              ? "重剪执行要点"
+              : "这次补拍要拍到"}
+          </strong>
+          {t.recommendation.subject_action && (
+            <p>{t.recommendation.subject_action}</p>
+          )}
+          <div className="recommendation-meta">
+            {t.recommendation.shot_scale && (
+              <span>{t.recommendation.shot_scale}</span>
+            )}
+            {t.recommendation.duration_s > 0 && (
+              <span>{t.recommendation.duration_s} 秒</span>
+            )}
+            {t.anchor && (
+              <span>
+                {t.recommendation.insert_position === "replace"
+                  ? "替换此处"
+                  : t.recommendation.insert_position === "before"
+                    ? "插在之前"
+                    : "插在之后"}{" "}
+                · {preciseTime(t.anchor.insert_at_s)}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       <div className="task-duration">
         <Icon name="clock" size={14} />
         预计人工投入 {t.estimated_effort_min} 分钟
@@ -234,7 +276,7 @@ function TaskCard({
       </div>
       {!!t.reference_frames?.length && (
         <div className="reference-frames">
-          {t.reference_frames.map((frame, i) => (
+          {t.reference_frames.slice(0, 2).map((frame, i) => (
             <a
               href={frame.url}
               key={i}
@@ -250,7 +292,10 @@ function TaskCard({
       )}
       <div className="acceptance">
         <h5>如何判断补好了？</h5>
-        {t.acceptance_checks.map((c, i) => (
+        {(t.recommendation?.acceptance_checks?.length
+          ? t.recommendation.acceptance_checks
+          : t.acceptance_checks
+        ).map((c, i) => (
           <div key={c}>
             <span>{String(i + 1).padStart(2, "0")}</span>
             {c}
@@ -271,7 +316,7 @@ function TaskCard({
       <div className="task-submit">
         {t.type === "reedit" ? (
           <button className="primary full-width" onClick={onEdit}>
-            前往粗剪调整 <Icon name="arrow" />
+            前往 Vlog 重剪 <Icon name="arrow" />
           </button>
         ) : (
           <>
@@ -353,14 +398,19 @@ function TaskCard({
                 </span>
               </div>
             ))}
-            {latest.new_evidence?.map((e) => (
+            {keyEvidence(
+              latest.new_evidence?.map((e) => e.id) || [],
+              latest.new_evidence || [],
+            ).map((e) => (
               <span className="verification-evidence" key={e.id}>
                 {e.action} · {e.source_start_s.toFixed(1)}–
                 {e.source_end_s.toFixed(1)}s
               </span>
             ))}
             {latest.verification_status === "passed" && (
-              <small>任务验收通过。请重新诊断，确认全部需求并更新粗剪。</small>
+              <small>
+                补拍片段已通过验收。重新诊断后可导出并对比修改效果。
+              </small>
             )}
           </div>
         )}
