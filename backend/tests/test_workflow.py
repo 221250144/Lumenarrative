@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from app.config import settings
 from app.models import SessionLocal, Project, AnalysisRun, Job, Asset
 from app.workflows.pipeline import create_analysis, analyze
-from app.services.media.pipeline import probe
 
 
 def ok(response, code=200):
@@ -28,7 +27,7 @@ def diagnosis(client, p):
     return ok(client.get(f"/api/v1/analyses/{run['analysis_id']}/diagnosis"))
 
 
-def test_real_upload_to_playable_export(client, tmp_path):
+def test_real_upload_remains_playable_and_analyzable_without_editing(client, tmp_path):
     original = tmp_path / "中文名字_静音.mp4"
     subprocess.run(
         [
@@ -77,24 +76,11 @@ def test_real_upload_to_playable_export(client, tmp_path):
     d = diagnosis(client, p)
     assert all(e["provenance"]["demo"] for e in d["evidence"])
     assert all(g["uncertain"] for g in d["gaps"])
-    render = ok(
-        client.post(
-            f"/api/v1/projects/{p['id']}/edits",
-            json={"analysis_id": d["analysis"]["id"]},
-        ),
-        202,
-    )
-    job = ok(client.get("/api/v1/jobs/" + render["job_id"]))
-    assert job["status"] == "succeeded", job
-    edit = ok(client.get("/api/v1/edits/" + render["edit_id"]))
-    result = client.get(edit["output_url"])
-    assert result.status_code == 200 and len(result.content) > 1000
-    exported = tmp_path / "export.mp4"
-    exported.write_bytes(result.content)
-    meta = probe(exported)
-    assert abs(meta["duration_s"] - 1.5) < 0.3 and meta["has_audio"]
-    edl = ok(client.get(edit["edl_url"]))
-    assert edl["timeline"][0]["asset_id"] == uploaded["asset_id"]
+    result = client.get(assets[0]["original_url"])
+    assert result.status_code == 200 and result.content == original.read_bytes()
+    assert client.post(
+        f"/api/v1/projects/{p['id']}/edits", json={"analysis_id": d["analysis"]["id"]},
+    ).status_code == 410
     invalid = client.post(
         f"/api/v1/projects/{p['id']}/assets",
         files={"file": ("fake.mp4", b"not a real video", "video/mp4")},
@@ -168,15 +154,10 @@ def test_missing_wrong_submission_then_correct_completion(client):
     new = diagnosis(client, p)
     assert new["gaps"] == []
     assert new["analysis"]["coverage"]["cached_asset_ids"]
-    rendered = ok(
-        client.post(
-            f"/api/v1/projects/{p['id']}/edits",
-            json={"analysis_id": new["analysis"]["id"]},
-        ),
-        202,
-    )
-    edit = ok(client.get("/api/v1/edits/" + rendered["edit_id"]))
-    assert len(edit["timeline"]) == 3, "未通过验收的补充素材不应自动进入粗剪"
+    # Both failed and accepted candidates remain available for the creator;
+    # task verification no longer leads into an in-product editing workflow.
+    assets = ok(client.get(f"/api/v1/projects/{p['id']}/assets"))
+    assert {wrong["asset_id"], right["asset_id"]} <= {asset["id"] for asset in assets}
 
 
 def test_all_required_story_cases(client):
@@ -224,7 +205,7 @@ def test_old_analysis_cannot_overwrite_project_and_corrections_persist(client):
     assert current["latest_analysis_id"] is None
     assert ok(client.get("/api/v1/analyses/" + run_id))["stale"]
     rejected = client.post(
-        f"/api/v1/projects/{p['id']}/edits", json={"analysis_id": run_id}
+        f"/api/v1/projects/{p['id']}/completion-plans", json={"analysis_id": run_id}
     )
     assert rejected.status_code == 409
     d = diagnosis(client, p)
@@ -333,14 +314,14 @@ def test_variable_frame_rate_and_audio_not_invented(client, tmp_path):
     assert a["has_audio"] and a["audio_status"] == "unconfigured"
     d = diagnosis(client, p)
     assert not d["analysis"]["coverage"]["audio_complete"]
-    protected = client.post(
+    retired = client.post(
         f"/api/v1/projects/{p['id']}/edits",
         json={
             "analysis_id": d["analysis"]["id"],
             "timeline": [{"asset_id": a["id"], "source_in_s": 0, "source_out_s": 1}],
         },
     )
-    assert protected.status_code == 409
+    assert retired.status_code == 410
 
 
 def test_concurrent_analysis_idempotency(client, monkeypatch):

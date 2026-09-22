@@ -160,39 +160,6 @@ export function Workbench({
           {diagnosis ? "重新按 Vlog 分析" : "分析这条 Vlog"}
         </button>
       </div>
-      <div className="workflow-steps">
-        {[
-          ["01", "上传 Vlog", !!primary],
-          ["02", "查看镜头切分", !!shots.length],
-          ["03", "定位具体问题", diagnosisCurrent],
-          ["04", "补拍或重剪", false],
-        ].map(([n, label, done]) => (
-          <div key={String(n)} className={done ? "step done" : "step"}>
-            <span>{done ? <Icon name="check" size={13} /> : n}</span>
-            {label}
-          </div>
-        ))}
-        <small>每条建议只保留关键证据</small>
-      </div>
-      {project.input_mode !== "vlog" && (
-        <div className="notice warning">
-          <Icon name="film" />
-          <span>
-            这是旧版项目。请从已有视频中选一条剪好的 Vlog
-            作为主片，再开始分析。历史数据会保留。
-          </span>
-        </div>
-      )}
-      {diagnosis && (legacy || diagnosis.analysis.stale) && (
-        <div className="notice warning">
-          <Icon name="alert" />
-          <span>
-            {legacy
-              ? "旧版诊断：下方保留历史结果。选好主片后，重新按 Vlog 分析，获得逐镜定位的建议。"
-              : "主片或审看重点已更新。下方为历史结果，请重新分析后再生成计划或导出。"}
-          </span>
-        </div>
-      )}
       <div className="workbench-grid vlog-workbench">
         <aside className="asset-panel vlog-source-panel">
           <div className="panel-title">
@@ -293,7 +260,13 @@ export function Workbench({
                   </option>
                 ))}
               </select>
-              <small>只分析所选主片。补充片段在修改任务中单独使用。</small>
+              {project.input_mode !== "vlog" ? (
+                <p className="action-hint" role="status">
+                  请为这个历史项目选择一条剪好的 Vlog 作为主片，再开始分析。
+                </p>
+              ) : (
+                <small>只分析所选主片。补拍视频在对应建议下单独上传。</small>
+              )}
             </div>
           )}
           {!!assets.filter((a) => a.id !== primary?.id && a.status !== "ready")
@@ -545,6 +518,13 @@ export function Workbench({
             aria-labelledby="vlog-diagnosis-title"
             aria-describedby="diagnosis-scroll-hint"
           >
+            {diagnosis && !diagnosisCurrent && (
+              <p className="action-hint" role="status">
+                {legacy
+                  ? "这里保留的是历史分析。选好主片后，点击“重新按 Vlog 分析”更新建议。"
+                  : "主片、审看重点或分析配置已更新。请重新分析当前 Vlog，再使用这些建议。"}
+              </p>
+            )}
             {!diagnosis ? (
               <div className="diagnosis-empty">
                 <div className="empty-spark">
@@ -687,7 +667,15 @@ export function Workbench({
               >
                 生成补拍与重剪清单 <Icon name="arrow" />
               </button>
-              <small>未确认的意见会保留为待核实任务。</small>
+              <small className="action-hint">
+                {busy
+                  ? "正在处理，请稍后生成清单。"
+                  : !diagnosisCurrent
+                    ? "请先重新分析当前 Vlog，再生成建议清单。"
+                    : !actionable.length
+                      ? "当前没有需要加入清单的修改建议。"
+                      : "未确认的建议会保留为待核实任务。"}
+              </small>
             </div>
           )}
         </aside>
@@ -848,7 +836,7 @@ function GapCard({
       <div className="gap-top">
         <span className={"badge " + (g.uncertain ? "" : "amber")}>
           {g.status === "resolved"
-            ? "已验证解决"
+            ? "已补足"
             : g.status === "dismissed"
               ? "已忽略"
               : g.status === "confirmed"
@@ -934,7 +922,11 @@ function GapCard({
           )}
           {!!recommendation.acceptance_checks.length && (
             <details>
-              <summary>拍到怎样算完成</summary>
+              <summary>
+                {recommendation.kind === "reedit"
+                  ? "调整后如何检查"
+                  : "拍到怎样算完成"}
+              </summary>
               <ul>
                 {recommendation.acceptance_checks
                   .slice(0, 4)

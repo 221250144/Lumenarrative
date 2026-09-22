@@ -7,17 +7,17 @@ import type {
   Analysis,
   Diagnosis,
   Plan,
-  Edit,
   Job,
   Health,
 } from "../types";
 import { Icon } from "../components/Icon";
+import { NotificationCenter } from "../components/NotificationCenter";
+import { copyText } from "../lib/clipboard";
 import { Projects } from "./Projects";
 import { Workbench } from "./Workbench";
 import { Tasks } from "./Tasks";
-import { Edits } from "./Edits";
 
-type Page = "projects" | "workspace" | "tasks" | "edits";
+type Page = "projects" | "workspace" | "tasks";
 export default function App() {
   const query = new URLSearchParams(window.location.search);
   const [projectId, setProjectId] = useState(query.get("project") || "");
@@ -28,12 +28,10 @@ export default function App() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [edits, setEdits] = useState<Edit[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const activeProject = useRef(projectId);
   const refreshSequence = useRef(0);
   const refresh = useCallback(async () => {
@@ -41,12 +39,11 @@ export default function App() {
     const all = await api<Project[]>("/projects");
     setProjects(all);
     if (!projectId) return;
-    const [p, a, r, pl, e, j] = await Promise.all([
+    const [p, a, r, pl, j] = await Promise.all([
       api<Project>(`/projects/${projectId}`),
       api<Asset[]>(`/projects/${projectId}/assets`),
       api<Analysis[]>(`/projects/${projectId}/analyses`),
       api<Plan[]>(`/projects/${projectId}/completion-plans`),
-      api<Edit[]>(`/projects/${projectId}/edits`),
       api<Job[]>(`/projects/${projectId}/jobs`),
     ]);
     if (
@@ -57,8 +54,7 @@ export default function App() {
     setProject(p);
     setAssets(a);
     setPlans(pl);
-    setEdits(e);
-    setJobs(j);
+    setJobs(j.filter((job) => job.type !== "render"));
     const latest =
       p.latest_analysis_id || r.find((run) => run.status === "succeeded")?.id;
     const d = latest
@@ -120,8 +116,9 @@ export default function App() {
     setDiagnosis(null);
     setAssets([]);
     setPlans([]);
-    setEdits([]);
     setJobs([]);
+    setError("");
+    setToast("");
     setPage("workspace");
     window.history.replaceState({}, "", `?project=${encodeURIComponent(id)}`);
   }
@@ -175,8 +172,6 @@ export default function App() {
       createIdempotencyKey(),
     );
   }
-  const busyJob = jobs.find((j) => ["queued", "running"].includes(j.status));
-  const failed = jobs.filter((j) => j.status === "failed");
   const canUse =
     !!diagnosis?.vlog &&
     project?.input_mode === "vlog" &&
@@ -204,7 +199,6 @@ export default function App() {
           <div>
             我的创作空间<small>Vlog 工作区</small>
           </div>
-          <span className="space-chevron">⌄</span>
         </div>
         <span className="nav-label">创作工具</span>
         <nav>
@@ -213,7 +207,6 @@ export default function App() {
               ["projects", "grid", "我的项目"],
               ["workspace", "spark", "Vlog 审看"],
               ["tasks", "layers", "补拍与重剪"],
-              ["edits", "film", "版本与导出"],
             ] as const
           ).map(([key, icon, label]) => (
             <button
@@ -240,14 +233,6 @@ export default function App() {
           </p>
           <span>以帧补光，以叙成章</span>
         </div>
-        <button
-          className="settings-button"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <Icon name="settings" />
-          运行与接入状态
-          <Icon name="arrow" size={14} />
-        </button>
         <div className="sidebar-bottom">
           <span className="status-dot" /> Vlog 专用 · v0.2
         </div>
@@ -275,79 +260,14 @@ export default function App() {
                   ? "真实模型模式"
                   : "连接中"}
             </span>
-            <span className="user-avatar">创</span>
           </div>
         </header>
-        {health?.provider === "mock" && (
-          <div className="demo-banner">
-            <Icon name="eye" size={14} />
-            <span>
-              当前为演示数据模式：视频处理与导出真实运行，叙事分析使用固定夹具。用户上传素材不会被假装成已理解。
-            </span>
-          </div>
-        )}
         <main
           className={
             "main-content" +
             (page === "workspace" && project ? " review-content" : "")
           }
         >
-          {error && (
-            <div className="error-banner" role="alert">
-              <Icon name="alert" />
-              <span>{error}</span>
-              <button
-                className="icon-button"
-                aria-label="关闭错误"
-                onClick={() => setError("")}
-              >
-                <Icon name="close" size={15} />
-              </button>
-            </div>
-          )}
-          {busyJob && page !== "projects" && (
-            <div className="progress-banner" aria-live="polite">
-              <span className="spinner" />
-              <strong>{busyJob.stage}</strong>
-              {busyJob.total_units > 0 && (
-                <span className="mono">
-                  {busyJob.completed_units} / {busyJob.total_units}
-                </span>
-              )}
-              <small>任务在后台处理，你可以继续查看素材。</small>
-            </div>
-          )}
-          {failed.length > 0 && page !== "projects" && (
-            <details className="failed-jobs">
-              <summary>
-                <Icon name="alert" size={14} />
-                {failed.length} 个任务需要处理
-              </summary>
-              {failed.map((j) => (
-                <div key={j.id}>
-                  <span>{j.error_message}</span>
-                  <button
-                    className="small-button"
-                    disabled={
-                      !!busy ||
-                      (j.type === "generation" &&
-                        j.generation_retryable === false)
-                    }
-                    onClick={() =>
-                      act("重试任务", async () => {
-                        await post(`/jobs/${j.id}/retry`);
-                      })
-                    }
-                  >
-                    <Icon name="refresh" size={13} />
-                    {j.type === "generation" && j.generation_retryable === false
-                      ? "无法直接重试"
-                      : "重试"}
-                  </button>
-                </div>
-              ))}
-            </details>
-          )}
           {page === "projects" ? (
             <Projects
               projects={projects}
@@ -444,125 +364,27 @@ export default function App() {
                   await submit(task, result.asset_id);
                 })
               }
-              onDemo={(task, correct) =>
-                act("准备演示补充镜头", async () => {
-                  const result = await post<{
-                    asset_id: string;
-                    job_id: string;
-                  }>(
-                    `/projects/${projectId}/demo-asset?role=${correct ? "process" : "result"}`,
-                  );
-                  await refresh();
-                  await waitJob(result.job_id);
-                  await submit(task, result.asset_id);
-                })
-              }
-              onEdit={() => setPage("edits")}
               onCopy={(text) =>
-                act("复制提示词", async () => {
-                  await navigator.clipboard.writeText(text);
-                  setToast("提示词已复制");
+                act("复制建议", async () => {
+                  await copyText(text);
+                  setToast("已复制，可粘贴到剪辑备忘或其他软件中");
                 })
               }
             />
-          ) : (
-            <Edits
-              project={project}
-              assets={assets}
-              edits={edits}
-              busy={!!busy}
-              canRender={canUse}
-              onRender={(timeline, allow) =>
-                act("创建粗剪任务", async () => {
-                  await post(`/projects/${projectId}/edits`, {
-                    analysis_id: diagnosis?.analysis.id,
-                    timeline,
-                    allow_reedit: allow,
-                  });
-                })
-              }
-            />
-          )}
+          ) : null}
         </main>
       </div>
-      {busy && (
-        <div className="action-toast" role="status">
-          <span className="spinner" />
-          {busy}…
-        </div>
-      )}
-      {toast && (
-        <div className="action-toast">
-          <Icon name="check" />
-          {toast}
-        </div>
-      )}
-      {settingsOpen && (
-        <div className="modal-overlay" onClick={() => setSettingsOpen(false)}>
-          <section
-            className="modal settings-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="运行与接入状态"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="icon-button modal-close"
-              aria-label="关闭"
-              onClick={() => setSettingsOpen(false)}
-            >
-              <Icon name="close" />
-            </button>
-            <span className="eyebrow">WORKSPACE STATUS</span>
-            <h2>运行与接入状态</h2>
-            <dl>
-              <dt>叙事分析</dt>
-              <dd>
-                {health?.provider === "mock"
-                  ? "固定演示夹具"
-                  : health?.model_configured
-                    ? "已配置模型服务"
-                    : "尚未配置模型凭据"}
-              </dd>
-              <dt>视频处理</dt>
-              <dd>
-                {health?.ffmpeg_available ? "FFmpeg 可用" : "FFmpeg 不可用"}
-              </dd>
-              <dt>音频转写</dt>
-              <dd>
-                {health?.asr_configured
-                  ? "已配置，调用结果见素材状态"
-                  : "尚未配置"}
-              </dd>
-              <dt>影石 SDK</dt>
-              <dd>未接入 · 可上传影石导出视频</dd>
-              <dt>文件限制</dt>
-              <dd>
-                {health?.limits.max_assets} 个 / {health?.limits.max_duration_s}{" "}
-                秒 / 单个 {health?.limits.max_upload_mb} MB
-              </dd>
-              {health?.model_destination && (
-                <>
-                  <dt>媒体发送目的地</dt>
-                  <dd>{health.model_destination}</dd>
-                </>
-              )}
-            </dl>
-            <p className="dim">
-              模型与密钥通过本地 .env
-              配置。真实模式失败会直接显示错误。影石设备接入不影响本地视频上传。
-            </p>
-            <a
-              className="small-button"
-              href="http://127.0.0.1:8000/docs"
-              target="_blank"
-              rel="noreferrer"
-            >
-              查看本地 API 文档 <Icon name="arrow" size={14} />
-            </a>
-          </section>
-        </div>
-      )}
+      <NotificationCenter
+        jobs={page === "projects" ? [] : jobs}
+        busy={busy}
+        error={error}
+        toast={toast}
+        isDemo={health?.provider === "mock"}
+        onDismissError={() => setError("")}
+        onRetry={(job) =>
+          void act("重试任务", () => post(`/jobs/${job.id}/retry`))
+        }
+      />
     </div>
   );
 }

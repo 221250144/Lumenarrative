@@ -7,12 +7,12 @@ import { Icon } from "./Icon";
 
 const active = (job: Job) => ["queued", "running"].includes(job.status);
 const verificationLabels: Record<string, string> = {
-  queued: "等待验收",
-  running: "正在验收",
-  passed: "已通过验收",
+  queued: "等待分析",
+  running: "正在分析",
+  passed: "符合补拍要求",
   partial: "部分满足要求",
-  failed: "未通过验收",
-  uncertain: "验收结果不确定",
+  failed: "未满足补拍要求",
+  uncertain: "需要人工复核",
 };
 
 export function TaskGeneration({
@@ -264,6 +264,23 @@ export function TaskGeneration({
     Number.isInteger(duration) && duration >= 3 && duration <= 15;
   const unavailable =
     options && (!options.available || !options.reference_frames.length);
+  const blockedReason = submitting
+    ? "正在提交生成任务，请稍候。"
+    : pendingIds
+      ? "这条建议已有片段正在生成，完成后可查看结果。"
+      : unavailable
+        ? options.reason || "当前任务没有可用的首帧参考，暂时无法生成。"
+        : busy
+          ? "其他操作正在处理中，请稍后生成。"
+          : !prompt.trim()
+            ? "请填写补全镜头描述。"
+            : !validDuration
+              ? "片段时长需为 3–15 秒的整数。"
+              : !options?.reference_frames[frameIndex]
+                ? "请选择一张可用的生成首帧。"
+                : "";
+  const blockedReasonId = `generation-blocked-${task.id}`;
+  const generationTermsId = `generation-terms-${task.id}`;
 
   return (
     <details
@@ -280,7 +297,7 @@ export function TaskGeneration({
       </summary>
       <div className="generation-body">
         <p className="generation-description">
-          把这条补拍建议变成一个候选镜头，生成后可预览并提交验收。
+          按这条补拍建议生成候选镜头，再分析它是否满足补拍要求。
         </p>
         {loading ? (
           <p className="generation-status" role="status">
@@ -288,7 +305,7 @@ export function TaskGeneration({
             正在准备生成选项…
           </p>
         ) : null}
-        {error && (
+        {error && !options && (
           <p className="generation-error" role="alert">
             {error}
           </p>
@@ -317,11 +334,6 @@ export function TaskGeneration({
         )}
         {options && (
           <>
-            {unavailable && (
-              <p className="generation-note" role="status">
-                {options.reason || "当前任务没有可用的首帧参考，暂时无法生成。"}
-              </p>
-            )}
             <fieldset
               className="generation-form"
               disabled={locked || !options.available}
@@ -400,13 +412,30 @@ export function TaskGeneration({
                 </label>
               </div>
             </fieldset>
-            <p className="generation-note">
+            <p className="generation-note" id={generationTermsId}>
               会使用百炼视频生成额度。仅按首帧生成，片段结尾与下一镜头的衔接需要审看。
             </p>
+            {error && (
+              <p className="generation-error" role="alert">
+                {error}
+              </p>
+            )}
+            {blockedReason && (
+              <p
+                className="generation-blocked"
+                role="status"
+                id={blockedReasonId}
+              >
+                {blockedReason}
+              </p>
+            )}
             <button
               className="primary full-width"
-              disabled={
-                locked || !!unavailable || !prompt.trim() || !validDuration
+              disabled={!!blockedReason}
+              aria-describedby={
+                blockedReason
+                  ? `${generationTermsId} ${blockedReasonId}`
+                  : generationTermsId
               }
               onClick={() => void generate()}
             >
@@ -472,8 +501,8 @@ export function TaskGeneration({
                 AI 生成 ·{" "}
                 {submission
                   ? verificationLabels[submission.verification_status] ||
-                    "待验收"
-                  : "待验收"}
+                    "待分析"
+                  : "待分析"}
               </span>
             </div>
             {completed.length > 1 && (
@@ -521,14 +550,18 @@ export function TaskGeneration({
                     onClick={() => onSubmit(task.id, resultAsset.id)}
                   >
                     <Icon name="check" size={14} />
-                    {submission?.verification_status === "passed"
-                      ? "再次验收"
-                      : "提交验收"}
+                    {["queued", "running"].includes(
+                      submission?.verification_status || "",
+                    )
+                      ? "正在分析…"
+                      : submission
+                        ? "重新分析片段"
+                        : "分析此片段"}
                   </button>
                 </div>
                 <small>
-                  这是 AI 生成的候选素材，原 Vlog
-                  保持不变。验收会对照上方补拍要求逐项检查。
+                  分析会对照本条补拍要求逐项检查。下载后可在剪辑软件中使用这段
+                  AI 候选素材。
                 </small>
               </>
             ) : (

@@ -5,18 +5,18 @@ import { TaskGeneration } from "../components/TaskGeneration";
 import { keyEvidence, preciseTime } from "../lib/evidence";
 
 const labels: Record<string, string> = {
-  reedit: "重剪现有素材",
+  reedit: "重剪建议",
   import_existing: "补入已有素材",
   reshoot: "实拍补拍",
   generate: "AI 生成补全",
 };
 const statuses: Record<string, string> = {
-  queued: "等待验证",
-  running: "正在验证",
-  passed: "通过验收",
+  queued: "等待补拍分析",
+  running: "正在分析补拍",
+  passed: "符合补拍要求",
   partial: "部分满足",
-  failed: "未通过验收",
-  uncertain: "无法确认",
+  failed: "未满足补拍要求",
+  uncertain: "需要人工复核",
 };
 export function Tasks({
   project,
@@ -26,8 +26,6 @@ export function Tasks({
   onPlan,
   onSubmit,
   onUpload,
-  onDemo,
-  onEdit,
   onCopy,
   onRefresh,
   busy,
@@ -40,8 +38,6 @@ export function Tasks({
   onPlan: (budget: number | null) => void;
   onSubmit: (task: string, asset: string) => void;
   onUpload: (task: string, file: File) => void;
-  onDemo: (task: string, correct: boolean) => void;
-  onEdit: () => void;
   onCopy: (text: string) => void;
   onRefresh: () => Promise<void>;
   busy: boolean;
@@ -49,6 +45,18 @@ export function Tasks({
 }) {
   const [budget, setBudget] = useState(plan?.budget_min?.toString() || "");
   const [filter, setFilter] = useState("all");
+  const validBudget =
+    budget === "" ||
+    (Number.isInteger(Number(budget)) &&
+      Number(budget) >= 0 &&
+      Number(budget) <= 600);
+  const planDisabledReason = busy
+    ? "正在处理，请稍后生成清单。"
+    : !canPlan
+      ? "请先在“Vlog 审看”中完成当前主片的分析。"
+      : !validBudget
+        ? "可投入时间需为 0–600 分钟的整数，也可以留空。"
+        : "";
   const tasks =
     plan?.tasks.filter(
       (t) =>
@@ -61,7 +69,7 @@ export function Tasks({
         <div>
           <span className="eyebrow">MAKE EVERY SHOT COUNT</span>
           <h1>Vlog 补拍与重剪清单</h1>
-          <p>对照具体位置补拍，或尝试 AI 生成候选镜头，再逐项验收。</p>
+          <p>查看重剪与补拍建议，生成候选镜头，或上传补拍视频分析。</p>
         </div>
         <div className="budget-control">
           <label>
@@ -76,14 +84,28 @@ export function Tasks({
             />
             <span>分钟</span>
           </label>
-          <button
-            className="primary"
-            disabled={busy || !canPlan}
-            onClick={() => onPlan(budget === "" ? null : Number(budget))}
-          >
-            <Icon name="layers" />
-            生成计划
-          </button>
+          <div className="plan-action">
+            <button
+              className="primary"
+              disabled={!!planDisabledReason}
+              aria-describedby={
+                planDisabledReason ? "plan-blocked-reason" : undefined
+              }
+              onClick={() => onPlan(budget === "" ? null : Number(budget))}
+            >
+              <Icon name="layers" />
+              生成清单
+            </button>
+            {planDisabledReason && (
+              <small
+                className="action-hint"
+                id="plan-blocked-reason"
+                role="status"
+              >
+                {planDisabledReason}
+              </small>
+            )}
+          </div>
         </div>
       </div>
       <div className="stat-row">
@@ -117,11 +139,22 @@ export function Tasks({
           </p>
         </div>
       </div>
-      {plan?.uncovered_gap_ids.length ? (
-        <div className="notice">
-          <Icon name="alert" />
-          存在待确认或预算内未覆盖的问题。推荐任务不会被当作全部缺口已解决。
-        </div>
+      {plan ? (
+        <details className="context-note plan-context">
+          <summary>
+            清单说明
+            {plan.uncovered_gap_ids.length
+              ? ` · ${plan.uncovered_gap_ids.length} 处问题尚未覆盖`
+              : ""}
+          </summary>
+          {plan.uncovered_gap_ids.length > 0 && (
+            <p>
+              部分问题仍待确认，或未包含在当前时间预算中，可逐条查看后再决定。
+            </p>
+          )}
+          <p>按建议在剪辑软件中完成重剪；补拍视频可在对应任务下上传分析。</p>
+          {plan.note && <p>{plan.note}</p>}
+        </details>
       ) : null}
       <div className="filter-tabs">
         {[
@@ -155,11 +188,8 @@ export function Tasks({
               )}
               jobs={jobs}
               busy={busy}
-              isDemo={!!project.demo_scenario}
               onSubmit={onSubmit}
               onUpload={onUpload}
-              onDemo={onDemo}
-              onEdit={onEdit}
               onCopy={onCopy}
               onRefresh={onRefresh}
             />
@@ -171,12 +201,11 @@ export function Tasks({
           <h3>{plan ? "当前筛选下没有任务" : "先审看你的 Vlog"}</h3>
           <p>
             {plan
-              ? "无需补拍时，可在“版本与导出”中审看现有 Vlog。"
+              ? "可以切换筛选查看其他建议，或回到“Vlog 审看”回放原片。"
               : "先在“Vlog 审看”中完成分镜分析并核实建议，再生成具体清单。"}
           </p>
         </div>
       )}
-      {plan && <p className="method-note">{plan.note}</p>}
     </div>
   );
 }
@@ -187,11 +216,8 @@ function TaskCard({
   assets,
   jobs,
   busy,
-  isDemo,
   onSubmit,
   onUpload,
-  onDemo,
-  onEdit,
   onCopy,
   onRefresh,
 }: {
@@ -200,11 +226,8 @@ function TaskCard({
   assets: Asset[];
   jobs: Job[];
   busy: boolean;
-  isDemo: boolean;
   onSubmit: (task: string, asset: string) => void;
   onUpload: (task: string, file: File) => void;
-  onDemo: (task: string, correct: boolean) => void;
-  onEdit: () => void;
   onCopy: (text: string) => void;
   onRefresh: () => Promise<void>;
 }) {
@@ -338,14 +361,35 @@ function TaskCard({
       )}
       <div className="task-submit">
         {t.type === "reedit" ? (
-          <button className="primary full-width" onClick={onEdit}>
-            前往 Vlog 重剪 <Icon name="arrow" />
-          </button>
+          <>
+            <p className="action-hint">
+              请在你使用的剪辑软件中，按上述位置和顺序调整视频。
+            </p>
+            <button
+              className="small-button"
+              onClick={() =>
+                onCopy(
+                  [
+                    t.requirement_description,
+                    t.anchor
+                      ? `原片位置：${preciseTime(t.anchor.start_s)}–${preciseTime(t.anchor.end_s)}`
+                      : "",
+                    t.recommendation?.instruction || t.instruction,
+                    t.continuity,
+                  ]
+                    .filter(Boolean)
+                    .join("\n"),
+                )
+              }
+            >
+              <Icon name="copy" size={13} /> 复制重剪建议
+            </button>
+          </>
         ) : (
           <>
             <label className={"upload-button " + (busy ? "disabled" : "")}>
               <Icon name="upload" />
-              上传补充片段并验证
+              上传补拍视频并分析
               <input
                 type="file"
                 accept="video/*,.mkv,.avi"
@@ -377,20 +421,12 @@ function TaskCard({
                 disabled={busy || !assetId}
                 onClick={() => onSubmit(t.id, assetId)}
               >
-                验证
+                分析片段
               </button>
             </div>
-            {isDemo && (
-              <div className="demo-submit">
-                <span>固定演示：</span>
-                <button disabled={busy} onClick={() => onDemo(t.id, true)}>
-                  补入正确镜头
-                </button>
-                <button disabled={busy} onClick={() => onDemo(t.id, false)}>
-                  试试无关镜头
-                </button>
-              </div>
-            )}
+            <p className="action-hint">
+              对照这条补拍建议，分析新片段是否补足了缺失内容。
+            </p>
           </>
         )}
         {latest && (
@@ -409,7 +445,7 @@ function TaskCard({
                 latest.verification_status}
               {latest.stale ? " · 历史结果" : ""}
             </strong>
-            <p>{latest.reason || "正在根据验收条件核实新素材…"}</p>
+            <p>{latest.reason || "正在对照补拍要求分析新素材…"}</p>
             {latest.checks?.map((c) => (
               <div className="check-result" key={c.check}>
                 <span className={c.status === "passed" ? "ready" : "dim"}>
@@ -432,7 +468,7 @@ function TaskCard({
             ))}
             {latest.verification_status === "passed" && (
               <small>
-                补充片段已通过验收。重新诊断后可导出并对比修改效果。
+                这段素材已满足本条补拍要求，可在剪辑软件中与原片组合。
               </small>
             )}
           </div>

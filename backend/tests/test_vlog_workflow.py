@@ -267,7 +267,7 @@ def test_inflight_project_change_saves_history_without_replacing_current(
     assert response.status_code == 409
 
 
-def test_default_export_preserves_long_primary_and_excludes_supplements(
+def test_long_primary_analysis_preserves_full_coverage_and_editing_is_retired(
     client, joined_vlog, tmp_path, deterministic_model, monkeypatch
 ):
     from app.api import routes
@@ -285,22 +285,17 @@ def test_default_export_preserves_long_primary_and_excludes_supplements(
     assets = ok(client.get(f"/api/v1/projects/{project['id']}/assets"))
     primary = next(asset for asset in assets if asset["id"] == primary_id)
     assert primary["duration_s"] > 30
-    # The API must build the complete EDL; rendering itself is covered elsewhere.
+    assert diagnosis["vlog"]["primary_asset_id"] == primary_id
+    assert {e["asset_id"] for e in diagnosis["evidence"]} == {primary_id}
+    assert supplement_id != primary_id
+    assert diagnosis["shots"][0]["start_s"] == 0
+    assert diagnosis["shots"][-1]["end_s"] == pytest.approx(primary["duration_s"])
     dispatched = []
     monkeypatch.setattr(routes, "dispatch", dispatched.append)
-    created = ok(client.post(f"/api/v1/projects/{project['id']}/edits", json={
+    retired = client.post(f"/api/v1/projects/{project['id']}/edits", json={
         "analysis_id": diagnosis["analysis"]["id"],
-    }), 202)
-    assert dispatched == [created["job_id"]]
-    assert ok(client.get("/api/v1/jobs/" + created["job_id"]))["status"] == "queued"
-    edit = ok(client.get("/api/v1/edits/" + created["edit_id"]))
-    edl = ok(client.get(edit["edl_url"]))
-    assert len(edl["timeline"]) == 1
-    clip = edl["timeline"][0]
-    assert clip["asset_id"] == primary_id and clip["asset_id"] != supplement_id
-    assert clip["source_in_s"] == 0
-    assert clip["source_out_s"] == pytest.approx(primary["duration_s"])
-    assert edit["duration_s"] == pytest.approx(primary["duration_s"])
+    })
+    assert retired.status_code == 410 and dispatched == []
 
 
 def test_supplement_still_processing_does_not_block_primary_analysis(

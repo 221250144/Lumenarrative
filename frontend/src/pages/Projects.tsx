@@ -97,7 +97,7 @@ export function Projects({
           <h2>
             我的创作 <span className="count">{projects.length}</span>
           </h2>
-          <p>从成片切分、逐镜审看，到补拍与重剪。</p>
+          <p>切分并审看 Vlog，获得具体补拍与重剪建议。</p>
         </div>
         <input
           className="search"
@@ -243,7 +243,7 @@ export function Projects({
               </label>
               <div className="form-row">
                 <label>
-                  目标时长
+                  期望时长（供建议参考）
                   <select name="duration" defaultValue="60">
                     <option value="30">30 秒</option>
                     <option value="60">60 秒</option>

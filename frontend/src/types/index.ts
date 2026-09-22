@@ -57,7 +57,6 @@ export type Job = {
   retry_count: number;
   asset_id?: string;
   analysis_id?: string;
-  edit_id?: string;
   submission_id?: string;
   task_id?: string;
   provider_task_id?: string;
@@ -218,22 +217,6 @@ export type Plan = {
   budget_min: number | null;
   estimated_effort_min: number;
   uncovered_gap_ids: string[];
-  note: string;
-};
-export type Clip = {
-  asset_id: string;
-  source_in_s: number;
-  source_out_s: number;
-};
-export type Edit = {
-  id: string;
-  created_at: string;
-  analysis_id: string;
-  render_status: string;
-  output_url: string | null;
-  edl_url: string;
-  duration_s: number;
-  timeline: Clip[];
   note: string;
 };
 export type Health = {

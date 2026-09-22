@@ -62,6 +62,14 @@ from app.workers.queue import dispatch
 
 router = APIRouter(prefix="/api/v1")
 
+EDITING_RETIRED_MESSAGE = "站内剪辑、版本管理和成片导出已停用，请下载所需素材后使用外部剪辑软件完成剪辑。"
+
+
+def editing_retired():
+    # Keep historical rows/files and in-flight worker code intact. This gate
+    # retires only the public editing surface, including old bookmarked URLs.
+    raise HTTPException(410, EDITING_RETIRED_MESSAGE)
+
 
 def session():
     with SessionLocal() as db:
@@ -618,7 +626,7 @@ def submit(id: str, body: SubmissionCreate, db: DB, idempotency_key: Key = None)
     return response
 
 
-@router.post("/projects/{id}/edits", status_code=202)
+@router.post("/projects/{id}/edits", status_code=202, dependencies=[Depends(editing_retired)], include_in_schema=False)
 def create_edit(id: str, body: EditCreate, db: DB):
     run = get(db, AnalysisRun, body.analysis_id)
     p = check_current(db, run, id)
@@ -685,7 +693,7 @@ def eligible_render_assets(db, project_id, assets, protected_primary=None):
     return [a for a in assets if a.id not in unverified or a.id == protected_primary]
 
 
-@router.get("/edits/{id}")
+@router.get("/edits/{id}", dependencies=[Depends(editing_retired)], include_in_schema=False)
 def get_edit(id: str, db: DB):
     row = get(db, EditVersion, id)
     data = serialize(row)
@@ -697,7 +705,7 @@ def get_edit(id: str, db: DB):
     }
 
 
-@router.get("/projects/{id}/edits")
+@router.get("/projects/{id}/edits", dependencies=[Depends(editing_retired)], include_in_schema=False)
 def list_edits(id: str, db: DB):
     get(db, Project, id)
     return [
@@ -710,7 +718,7 @@ def list_edits(id: str, db: DB):
     ]
 
 
-@router.get("/edits/{id}/video")
+@router.get("/edits/{id}/video", dependencies=[Depends(editing_retired)], include_in_schema=False)
 def edit_video(id: str, db: DB):
     edit = get(db, EditVersion, id)
     if not edit.output_key or not storage.path(edit.output_key).is_file():
@@ -723,7 +731,7 @@ def edit_video(id: str, db: DB):
     )
 
 
-@router.get("/edits/{id}/edl")
+@router.get("/edits/{id}/edl", dependencies=[Depends(editing_retired)], include_in_schema=False)
 def edit_edl(id: str, db: DB):
     edit = get(db, EditVersion, id)
     return JSONResponse(
@@ -786,6 +794,8 @@ async def job_events(id: str, request: Request):
 @router.post("/jobs/{id}/retry", status_code=202)
 def retry_job(id: str, db: DB):
     job = get(db, Job, id)
+    if job.type == "render":
+        editing_retired()
     if job.status in ("running", "queued"):
         if job.type == "generation":
             # A live worker owns a per-job OS lock and ignores duplicate delivery.
