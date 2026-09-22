@@ -1,0 +1,78 @@
+name: xuguangji
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  environment: &environment
+    DATABASE_URL: postgresql+psycopg://xuguangji:xuguangji_local@db:5432/xuguangji
+    REDIS_URL: redis://redis:6379/0
+    QUEUE_MODE: celery
+    DATA_DIR: /app/data
+    MODEL_PROVIDER: ${MODEL_PROVIDER:-mock}
+    MODEL_BASE_URL: ${MODEL_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+    MODEL_API_KEY: ${MODEL_API_KEY:-}
+    VLM_MODEL: ${VLM_MODEL:-qwen-vl-plus}
+    LLM_MODEL: ${LLM_MODEL:-qwen-plus}
+    MODEL_TIMEOUT_S: ${MODEL_TIMEOUT_S:-90}
+    ASR_BASE_URL: ${ASR_BASE_URL:-}
+    ASR_API_KEY: ${ASR_API_KEY:-}
+    ASR_MODEL: ${ASR_MODEL:-}
+  volumes:
+    - media:/app/data
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: xuguangji
+      POSTGRES_USER: xuguangji
+      POSTGRES_PASSWORD: xuguangji_local
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U xuguangji"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, "yes"]
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  migrate:
+    <<: *backend
+    command: [alembic, -c, backend/alembic.ini, upgrade, head]
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    <<: *backend
+    ports:
+      - 127.0.0.1:8000:8000
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+  worker:
+    <<: *backend
+    command: [celery, -A, app.workers.queue.celery_app, worker, --loglevel=INFO, --concurrency=2]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+  web:
+    build: ./frontend
+    ports:
+      - 127.0.0.1:5173:80
+    depends_on:
+      - api
+volumes:
+  media:
+  postgres:
+  redis:
