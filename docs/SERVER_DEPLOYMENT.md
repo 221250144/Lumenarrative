@@ -5,7 +5,7 @@
 ## 当前状态
 
 - 前端生产构建、FastAPI、PostgreSQL 16、Redis 7、Celery 和 FFmpeg 已部署。Nginx、数据库、Redis、API 和 worker 已启用开机自启。
-- 服务器通过本地接口和 SSH 隧道验证了真实千问诊断、后台队列、MP4 导出及 HTTP Range 播放；Linux 上 17 项后端测试通过。
+- 服务器通过公网 HTTP 验证了新版 Vlog 切分、真实千问诊断、后台队列、MP4 导出及 HTTP Range 播放；Linux 上 66 项后端测试通过。
 - 按用户要求使用 `http://47.110.79.237`，不跳转 HTTPS，不要求账号密码。公网页面、健康检查和项目接口均已通过当前电脑的系统代理返回 HTTP 200；Edge 浏览器也已实际打开页面。
 - 当前电脑绕过代理的直连测试仍超时，这与浏览器实际可访问的结果不同，不能据此认定安全组未放行。若某个网络无法访问，应分别检查客户端网络路径和服务器入口。
 - 数据库、Redis、后端与管理预览端口只监听回环地址。模型密钥只在受保护的服务端配置中。
@@ -16,7 +16,7 @@
 |路径或服务|用途|
 |---|---|
 |`/opt/xuguangji/current`|指向当前发布目录的符号链接|
-|`/opt/xuguangji/releases/c398b58-20260922`|本次应用代码及前端构建|
+|`/opt/xuguangji/releases/vlog-v2-20260922-1`|本次应用代码及前端构建|
 |`/opt/xuguangji/venv`|Python 3.12 运行环境|
 |`/opt/xuguangji/certbot`|Certbot 5.8.0 独立环境|
 |`/etc/xuguangji/app.env`|数据库与百炼配置，`root:xuguangji`、`0640`|
@@ -25,7 +25,7 @@
 |`xuguangji-worker.service`|Celery，2 个 worker 进程|
 |Nginx `127.0.0.1:8080`|仅用于 SSH 隧道的完整网页入口|
 
-本次使用 systemd 原生部署；Docker Hub 在服务器上连接超时，没有运行 Docker Compose。发布包通过 SSH 上传，不在服务器保存 GitHub 登录凭据。原有本地项目数据未迁移，服务器只创建了一个明确标注的纯色视频验证项目。
+本次使用 systemd 原生部署；Docker Hub 在服务器上连接超时，没有运行 Docker Compose。发布包通过 SSH 上传，不在服务器保存 GitHub 登录凭据。原有本地项目数据未迁移；本次保留服务器已有项目与历史结果，仅新增明确标注的三镜头合成验证项目。切换前数据库与媒体备份保存在 `/opt/xuguangji/backups/vlog-v2-20260922`。
 
 ## SSH 隧道访问
 
@@ -85,10 +85,10 @@ uv pip compile backend/requirements.in --python-version 3.12 \
 
 ## 实际验证
 
-- Linux 后端测试：17 项通过。
+- Linux 后端测试：66 项通过。
 - 公网 HTTP 网页与 API 无认证请求返回 200，无 HTTPS 重定向和登录挑战。
 - 前端 HTTP UUID fallback：原生分支、无 `randomUUID` 分支均通过校验，生成 1000 个不同的合法 UUIDv4；生产构建通过。
 - 健康检查：`provider=qwen`、`model_configured=true`、`queue_mode=celery`。
-- 3 秒程序生成的纯色视频：预处理、真实千问分析、导出作业全部 `succeeded`，视觉证据标记为真实模型，失败区间为空。
+- 3 秒三镜头合成视频：预处理切出 3 个镜头，真实千问观察和全片审阅、导出作业全部 `succeeded`；失败区间为空，没有为抽象测试画面强行生成补拍建议。
 - 导出下载后 FFprobe 检出 H.264 + AAC，时长约 3.02 秒；Range 请求返回 206，EDL 包含一段有效素材。
 - 测试材料是合成色块，验证部署链路，不代表实拍叙事识别效果。
