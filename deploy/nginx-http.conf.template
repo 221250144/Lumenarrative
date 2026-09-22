@@ -1,0 +1,11 @@
+server {
+    listen 80;
+    server_name __PUBLIC_HOST__;
+    server_tokens off;
+    include /etc/nginx/snippets/xuguangji-app.conf;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/xuguangji-acme;
+        default_type text/plain;
+    }
+}

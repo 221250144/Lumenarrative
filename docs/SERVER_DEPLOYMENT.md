@@ -6,9 +6,10 @@
 
 - 前端生产构建、FastAPI、PostgreSQL 16、Redis 7、Celery 和 FFmpeg 已部署。Nginx、数据库、Redis、API 和 worker 已启用开机自启。
 - 服务器通过本地接口和 SSH 隧道验证了真实千问诊断、后台队列、MP4 导出及 HTTP Range 播放；Linux 上 17 项后端测试通过。
-- 公网 TCP 80 连接超时，服务器 Nginx 正常监听且主机 INPUT 策略为 ACCEPT。需要在阿里云实例安全组放行 TCP 80、443，再完成 HTTPS 签发及外网验收；当前不宣称公网可用。
-- 团队入口使用 Nginx Basic Auth。数据库、Redis、后端与管理预览端口只监听回环地址。登录密码和模型密钥不在仓库内。
-- 当前可通过 SSH 隧道访问。证书申请脚本与自动续期配置已准备，尚待公网端口放行后执行。
+- 按用户要求使用 `http://47.110.79.237`，不跳转 HTTPS，不要求账号密码。公网页面、健康检查和项目接口均已通过当前电脑的系统代理返回 HTTP 200；Edge 浏览器也已实际打开页面。
+- 当前电脑绕过代理的直连测试仍超时，这与浏览器实际可访问的结果不同，不能据此认定安全组未放行。若某个网络无法访问，应分别检查客户端网络路径和服务器入口。
+- 数据库、Redis、后端与管理预览端口只监听回环地址。模型密钥只在受保护的服务端配置中。
+- HTTPS 与证书续期未启用；仓库保留可选脚本，只有后续明确改用 HTTPS 时再执行。
 
 ## 目录与服务
 
@@ -19,7 +20,6 @@
 |`/opt/xuguangji/venv`|Python 3.12 运行环境|
 |`/opt/xuguangji/certbot`|Certbot 5.8.0 独立环境|
 |`/etc/xuguangji/app.env`|数据库与百炼配置，`root:xuguangji`、`0640`|
-|`/etc/xuguangji/htpasswd`|网页访问密码的 bcrypt 哈希，`root:www-data`、`0640`|
 |`/var/lib/xuguangji/media`|上传、采样帧、代理及导出媒体|
 |`xuguangji-api.service`|FastAPI，监听 `127.0.0.1:8000`|
 |`xuguangji-worker.service`|Celery，2 个 worker 进程|
@@ -37,9 +37,13 @@ ssh -i _NJU_Token.pem -N \
   root@47.110.79.237
 ```
 
-浏览器打开 `http://127.0.0.1:18080`，输入单独交付的团队账号密码。隧道必须保持运行；这个 localhost 地址只有建立隧道的电脑可以使用。
+浏览器打开 `http://127.0.0.1:18080` 即可，无需登录。隧道必须保持运行；这个 localhost 地址只有建立隧道的电脑可以使用。普通使用直接访问公网 HTTP 地址即可，无需建立隧道。
 
-## 完成公网 HTTPS
+## HTTP 配置
+
+Nginx 使用 `deploy/nginx-http.conf.template` 和 `deploy/nginx-app.conf`，监听 80 端口并直接提供前端及 API，`auth_basic off`。前端为不支持 `crypto.randomUUID()` 的 HTTP 上下文提供基于 `crypto.getRandomValues()` 的 UUIDv4 实现，素材上传和分析请求仍使用幂等键。
+
+## 可选 HTTPS（当前未启用）
 
 1. 在阿里云 ECS 中找到该实例的安全组，允许入方向 TCP 80 和 TCP 443，来源 `0.0.0.0/0`。后端 8000、管理 8080、数据库 5432 和 Redis 6379 无需对公网开放。
 2. 从服务器外访问 `http://47.110.79.237/.well-known/acme-challenge/connectivity-check`，应返回 `xuguangji-ready`。
@@ -49,7 +53,7 @@ ssh -i _NJU_Token.pem -N \
 bash /opt/xuguangji/current/deploy/enable-https.sh 47.110.79.237
 ```
 
-脚本先做 Let's Encrypt 测试环境验证，再申请受信任证书；通过 Nginx 配置检查后启用 HTTPS，安装每 12 小时检查一次的续期 timer，并执行一次续期演练。HTTP 会跳转到 HTTPS，所有应用页面和接口均要求团队密码。
+脚本先做 Let's Encrypt 测试环境验证，再申请受信任证书；通过 Nginx 配置检查后启用 HTTPS，安装每 12 小时检查一次的续期 timer，并执行一次续期演练。执行后 HTTP 会跳转到 HTTPS，访问方式仍为免登录。当前用户要求使用 HTTP，因此未执行此流程。
 
 IP 证书需使用 `shortlived` profile，Certbot webroot 方式要求 5.4 及以上版本，参见 [Let's Encrypt 官方说明](https://letsencrypt.org/2026/03/11/shorter-certs-certbot/)。切勿将只有证书申请脚本准备好当作 HTTPS 已验收。
 
@@ -62,7 +66,7 @@ systemctl restart xuguangji-api xuguangji-worker
 systemctl list-timers xuguangji-cert-renew.timer
 ```
 
-修改 `/etc/xuguangji/app.env` 后重启 API 和 worker。更换网页密码可在服务器运行 `htpasswd -B /etc/xuguangji/htpasswd xuguangji`，交互输入新密码即可，无需把密码写到命令行参数。
+修改 `/etc/xuguangji/app.env` 后重启 API 和 worker。网页入口不使用账号密码。
 
 代码更新使用新的 release 目录，上传源代码和 `frontend/dist`，安装 Linux 锁文件中的依赖，链接受保护的 `.env`，执行 Alembic 迁移，再切换 `current` 并重启两个服务。更新前应等正在执行的作业结束，并备份 PostgreSQL 与 `/var/lib/xuguangji/media`；回退代码不能代替数据库恢复。当前未配置异地备份或业务监控告警。
 
@@ -82,7 +86,8 @@ uv pip compile backend/requirements.in --python-version 3.12 \
 ## 实际验证
 
 - Linux 后端测试：17 项通过。
-- 网页与 API 匿名访问返回 401，带团队凭据请求成功。
+- 公网 HTTP 网页与 API 无认证请求返回 200，无 HTTPS 重定向和登录挑战。
+- 前端 HTTP UUID fallback：原生分支、无 `randomUUID` 分支均通过校验，生成 1000 个不同的合法 UUIDv4；生产构建通过。
 - 健康检查：`provider=qwen`、`model_configured=true`、`queue_mode=celery`。
 - 3 秒程序生成的纯色视频：预处理、真实千问分析、导出作业全部 `succeeded`，视觉证据标记为真实模型，失败区间为空。
 - 导出下载后 FFprobe 检出 H.264 + AAC，时长约 3.02 秒；Range 请求返回 206，EDL 包含一段有效素材。

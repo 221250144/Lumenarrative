@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api, post, patch, upload, watchJob } from "../api/client";
+import { createIdempotencyKey } from "../api/idempotency";
 import type {
   Project,
   Asset,
@@ -135,7 +136,7 @@ export default function App() {
   }
   const analyze = () =>
     act("创建分析任务", async () => {
-      await post(`/projects/${projectId}/analyses`, {}, crypto.randomUUID());
+      await post(`/projects/${projectId}/analyses`, {}, createIdempotencyKey());
     });
   const makePlan = (budget: number | null = 30) =>
     act("生成修改计划", async () => {
@@ -158,7 +159,7 @@ export default function App() {
     await post(
       `/completion-tasks/${task}/submissions`,
       { asset_id: asset },
-      crypto.randomUUID(),
+      createIdempotencyKey(),
     );
   }
   const busyJob = jobs.find((j) => ["queued", "running"].includes(j.status));
@@ -371,7 +372,7 @@ export default function App() {
                   await post(
                     `/projects/${projectId}/analyses`,
                     {},
-                    crypto.randomUUID(),
+                    createIdempotencyKey(),
                   );
                 })
               }

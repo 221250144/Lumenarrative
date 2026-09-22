@@ -24,7 +24,7 @@
 
 ## 自动化测试覆盖
 
-2026-09-22 补充：Ubuntu 服务器部署后，Linux 测试同样 17 项通过；实际 PostgreSQL + Redis + Celery 环境跑通真实模型分析与 MP4 导出。外网连接仍待安全组放行，详见 `SERVER_DEPLOYMENT.md`。
+2026-09-22 补充：Ubuntu 服务器部署后，Linux 测试同样 17 项通过；实际 PostgreSQL + Redis + Celery 环境跑通真实模型分析与 MP4 导出。公网 HTTP 免登录访问经系统代理返回 200，Edge 已实际打开；补齐 HTTP 环境的 UUID fallback 并通过针对性校验和前端生产构建，详见 `SERVER_DEPLOYMENT.md`。
 
 - 源时间合法性、重叠分段、分离时间的同一动作不会误合并。
 - 不存在的证据 ID、错误的证据类型、重复需求结果会被拒绝。

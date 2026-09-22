@@ -1,4 +1,5 @@
 import type { Job } from "../types";
+import { createIdempotencyKey } from "./idempotency";
 
 export async function api<T>(
   path: string,
@@ -30,7 +31,7 @@ export async function upload(projectId: string, file: File, source: string) {
     {
       method: "POST",
       body: form,
-      headers: { "Idempotency-Key": crypto.randomUUID() },
+      headers: { "Idempotency-Key": createIdempotencyKey() },
     },
   );
 }
