@@ -16,6 +16,7 @@ export type Project = {
 };
 export type Shot = {
   id: string;
+  source_shot_ids?: string[];
   asset_id: string;
   index: number;
   start_s: number;
@@ -136,6 +137,7 @@ export type Analysis = {
 };
 export type Diagnosis = {
   shots?: Shot[];
+  display_shots?: Shot[];
   vlog?: {
     summary: string;
     vlog_type: string;

@@ -185,7 +185,11 @@ export default function App() {
     !diagnosis.analysis.stale &&
     diagnosis.analysis.status === "succeeded";
   return (
-    <div className="app-shell">
+    <div
+      className={
+        "app-shell" + (page === "workspace" && project ? " review-layout" : "")
+      }
+    >
       <aside className="sidebar">
         <button className="brand" onClick={() => navigate("projects")}>
           <span className="brand-mark">
@@ -282,7 +286,12 @@ export default function App() {
             </span>
           </div>
         )}
-        <main className="main-content">
+        <main
+          className={
+            "main-content" +
+            (page === "workspace" && project ? " review-content" : "")
+          }
+        >
           {error && (
             <div className="error-banner" role="alert">
               <Icon name="alert" />

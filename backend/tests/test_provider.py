@@ -80,3 +80,31 @@ def test_auth_failure_does_not_leak_key_or_fallback(monkeypatch):
     assert "test-key" not in str(error.value) and "private payload" not in str(
         error.value
     )
+
+
+@pytest.mark.parametrize("seconds,read_limit", [(900, 900), (0, None)])
+def test_long_inference_timeout_keeps_connection_and_upload_bounded(monkeypatch, seconds, read_limit):
+    seen = []
+
+    def handler(request):
+        seen.append(request.extensions["timeout"])
+        return response('{"requirements": []}')
+
+    monkeypatch.setattr(settings, "model_timeout_s", seconds)
+    configure(monkeypatch, handler)
+    CompatibleProvider().generate_structured("test", {}, RequirementsOutput)
+    assert seen == [{"connect": 30.0, "read": read_limit, "write": 60.0, "pool": 30.0}]
+
+
+def test_model_read_timeout_is_clear_and_does_not_retry_paid_request(monkeypatch):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    monkeypatch.setattr(settings, "model_timeout_s", 900)
+    configure(monkeypatch, handler)
+    with pytest.raises(ValueError, match="单次模型响应等待超时.*900"):
+        CompatibleProvider().generate_structured("test", {}, RequirementsOutput)
+    assert len(calls) == 1

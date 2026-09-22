@@ -9,7 +9,7 @@ import pytest
 
 from app.config import settings
 from app.providers.storage import storage
-from app.services.media.pipeline import SEGMENTATION_VERSION, dense_frames, preprocess, probe, run, _extract_selected_frames, _scan_frames
+from app.services.media.pipeline import SEGMENTATION_VERSION, MIN_SHOT_DURATION_S, dense_frames, preprocess, probe, run, _extract_selected_frames, _scan_frames
 
 
 pytestmark = pytest.mark.skipif(
@@ -71,6 +71,7 @@ def assert_timeline(meta, duration):
         for frame in item["keyframes"]:
             assert item["start_s"] <= frame["time_s"] < item["end_s"]
             assert storage.path(frame["key"]).is_file()
+    assert len(shots) == 1 or all(round(shot["end_s"] - shot["start_s"], 6) >= MIN_SHOT_DURATION_S for shot in shots)
     for window in meta["shots"]:
         parent = by_id[window["shot_id"]]
         assert parent["start_s"] <= window["start_s"] < window["end_s"] <= parent["end_s"]
@@ -118,20 +119,35 @@ def test_large_selection_extracts_exact_frames_without_expression_depth_failure(
         assert rgb[channel] > max(rgb[i] for i in range(3) if i != channel) + 70
 
 
-def test_subsecond_montage_never_loses_short_shot_images(media_root):
+def test_subsecond_montage_merges_short_shots_without_dropping_video_time(media_root):
     asset = make_asset(media_root, [
         ("red", 0.16, ""), ("blue", 0.12, ""), ("white", 0.2, ""),
         ("green", 0.08, ""), ("red", 0.16, ""),
     ])
     meta = process(asset)
     assert_timeline(meta, 0.72)
-    assert meta["scene_boundaries"] == pytest.approx([0.16, 0.28, 0.48, 0.56], abs=0.001)
-    assert len(meta["scene_shots"]) == 5
-    assert len(meta["shots"]) == 5
-    assert all(shot["keyframes"] for shot in meta["scene_shots"])
-    # Every short shot has its own decoded image, including those between 1fps ticks.
-    assert len({shot["thumbnail_key"] for shot in meta["scene_shots"]}) == 5
-    assert len(meta["scene_shots"][3]["keyframes"]) == 2
+    assert meta["scene_boundaries"] == []
+    assert len(meta["scene_shots"]) == len(meta["shots"]) == 1
+    shot = meta["scene_shots"][0]
+    assert (shot["start_s"], shot["end_s"]) == (0, 0.72)
+    assert shot["keyframes"][0]["time_s"] == 0
+    assert shot["keyframes"][-1]["time_s"] == pytest.approx(0.68)
+    assert meta["segmentation"]["minimum_shot_duration_s"] == 0.5
+
+
+@pytest.mark.parametrize("clips", [
+    [("red", 0.16, ""), ("blue", 1, ""), ("white", 0.12, "")],
+    [("red", 1, ""), ("blue", 0.12, ""), ("white", 1, "")],
+    [("red", 0.52, ""), ("blue", 0.52, ""), ("white", 0.52, "")],
+    [("red", 0.16, ""), ("blue", 0.16, "")],
+])
+def test_real_media_short_edges_middle_and_whole_clip_remain_fully_covered(media_root, clips):
+    asset = make_asset(media_root, clips)
+    meta = process(asset)
+    assert_timeline(meta, asset.duration_s)
+    assert sum(shot["end_s"] - shot["start_s"] for shot in meta["scene_shots"]) == pytest.approx(asset.duration_s)
+    if asset.duration_s < 0.5:
+        assert len(meta["scene_shots"]) == 1
 
 
 def test_long_continuous_take_is_one_shot_with_contained_analysis_windows(media_root):
@@ -151,7 +167,7 @@ def test_long_continuous_take_is_one_shot_with_contained_analysis_windows(media_
 
 
 def test_retry_replaces_frame_set_and_keeps_stable_shot_ids(media_root):
-    asset = make_asset(media_root, [("red", 0.2, ""), ("blue", 0.2, "")], fps=30)
+    asset = make_asset(media_root, [("red", 0.6, ""), ("blue", 0.6, "")], fps=30)
     first = process(asset)
     folder = storage.path(asset.storage_key).parent
     generation = storage.path(first["scene_shots"][0]["thumbnail_key"]).parent
@@ -198,3 +214,54 @@ def test_local_review_has_real_frames_and_preserves_older_frame_sets(media_root,
     for frame in short_review:
         red, green, blue = average_rgb(frame["key"])
         assert blue > max(red, green) + 70
+
+
+def test_reanalysis_upgrades_legacy_asset_without_rewriting_analysis_history(client, media_root, monkeypatch):
+    from app.models import SessionLocal, Asset
+    from app.services.media import pipeline as media_pipeline
+    from app.workflows import pipeline as workflow_pipeline, vlog as vlog_workflow
+
+    source = make_asset(media_root, [("red", 2, ""), ("blue", 0.2, ""), ("white", 2, "")])
+    response = client.post("/api/v1/projects", json={"title": "Legacy shots", "intent": "Check source coverage"})
+    assert response.status_code == 201
+    project_id = response.json()["id"]
+
+    def analyze():
+        started = client.post(f"/api/v1/projects/{project_id}/analyses")
+        assert started.status_code == 202
+        ids = started.json()
+        job = client.get("/api/v1/jobs/" + ids["job_id"]).json()
+        assert job["status"] == "succeeded", job
+        return client.get(f"/api/v1/analyses/{ids['analysis_id']}/diagnosis").json()
+
+    # Build actual old media and an immutable old analysis snapshot, not just a
+    # fabricated version marker on media already processed by the new policy.
+    with monkeypatch.context() as legacy:
+        legacy.setattr(media_pipeline, "SEGMENTATION_VERSION", "vlog-shots-v2")
+        legacy.setattr(media_pipeline, "select_shot_boundaries", lambda boundaries, *args: boundaries)
+        legacy.setattr(workflow_pipeline, "SEGMENTATION_VERSION", "vlog-shots-v2")
+        legacy.setattr(vlog_workflow, "SEGMENTATION_VERSION", "vlog-shots-v2")
+        with storage.path(source.storage_key).open("rb") as stream:
+            uploaded = client.post(f"/api/v1/projects/{project_id}/assets", files={"file": ("legacy.mp4", stream, "video/mp4")})
+        assert uploaded.status_code == 202
+        asset_id = uploaded.json()["asset_id"]
+        first = analyze()
+        assert len(first["shots"]) == 3
+        with SessionLocal() as db:
+            old = db.get(Asset, asset_id)
+            old_keys = {frame["key"] for shot in old.meta["scene_shots"] for frame in shot["keyframes"]}
+            assert old.meta["segmentation_version"] == "vlog-shots-v2"
+
+    second = analyze()
+    assert len(second["shots"]) == 2
+    assert all(round(shot["end_s"] - shot["start_s"], 6) >= 0.5 for shot in second["shots"])
+    assert first["analysis"]["config_hash"] != second["analysis"]["config_hash"]
+    assert second["analysis"]["coverage"]["cached_asset_ids"] == []
+    current_asset = client.get(f"/api/v1/projects/{project_id}/assets").json()[0]
+    assert current_asset["segmentation_version"] == SEGMENTATION_VERSION
+    assert len(current_asset["shots"]) == current_asset["shot_count"] == 2
+    history = client.get(f"/api/v1/analyses/{first['analysis']['id']}/diagnosis").json()
+    assert history["shots"] == first["shots"]
+    assert history["evidence"] == first["evidence"]
+    assert history["analysis"]["config_hash"] == first["analysis"]["config_hash"]
+    assert all(storage.path(key).is_file() for key in old_keys)

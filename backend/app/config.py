@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     model_api_key: str = ""
     vlm_model: str = "qwen3.8-max"
     llm_model: str = "qwen-plus"
-    model_timeout_s: int = 180
+    model_timeout_s: int = Field(default=900, ge=0)
     model_concurrency: int = Field(default=8, ge=1, le=32)
     media_concurrency: int = Field(default=2, ge=1, le=8)
     ffmpeg_threads: int = Field(default=4, ge=1, le=32)

@@ -12,11 +12,12 @@ from pathlib import Path
 from app.config import settings
 from app.providers.storage import storage
 from app.services.concurrency import resource_slot
+from app.services.media.shot_boundaries import MIN_SHOT_DURATION_S, select_shot_boundaries
 
 
 # Changing shot detection or timestamp selection requires a new version so older
 # assets are reprocessed before their shots are used for Vlog diagnosis.
-SEGMENTATION_VERSION = "vlog-shots-v2"
+SEGMENTATION_VERSION = "vlog-shots-v3-min500ms"
 SCENE_SCORE_THRESHOLD = 0.22
 
 
@@ -176,8 +177,8 @@ def _scene_boundaries(frames, black_intervals, duration):
     timestamps = [frame["time_s"] for frame in frames]
     steps = [b - a for a, b in zip(timestamps, timestamps[1:]) if b > a]
     frame_step = statistics.median(steps) if steps else duration
-    # Suppress adjacent-frame flicker, but keep genuine short shots a few frames
-    # long. A fixed 1s debounce would erase exactly those Vlog montage shots.
+    # First suppress adjacent-frame flicker. The minimum-length pass below then
+    # merges cuts closer than 0.5s while retaining the stronger available cut.
     debounce = max(0.015, min(0.075, frame_step * 1.1))
     candidates = [
         {"time_s": frame["time_s"], "score": frame["score"], "type": "hard_cut"}
@@ -208,7 +209,7 @@ def _scene_boundaries(frames, black_intervals, duration):
                 kept[-1] = candidate
         else:
             kept.append(candidate)
-    return kept
+    return select_shot_boundaries(kept, 0.0, duration)
 
 
 def _analysis_windows(start: float, end: float):
@@ -338,7 +339,8 @@ def _preprocess(asset, progress):
         selections.update(indices)
         scene_shots.append({
             "id": shot_id, "index": index, "start_s": start, "end_s": end,
-            "boundary_type": begin["type"], "frame_indices": indices,
+            "boundary_type": begin["type"], "boundary_score": begin.get("score", 0.0),
+            "frame_indices": indices,
         })
         for window_start, window_end in _analysis_windows(start, end):
             indices = _sample_indices(frames, window_start, window_end)
@@ -376,7 +378,9 @@ def _preprocess(asset, progress):
         "segmentation": {
             "method": "ffmpeg_rgb_scene_score_and_blackdetect",
             "scene_threshold": SCENE_SCORE_THRESHOLD,
-            "limitations": "硬切自动检测；经过黑场的淡入淡出仅为候选。复杂叠化、快速摇镜和闪光可能漏检或误分。分析窗口不代表转场。",
+            "minimum_shot_duration_s": MIN_SHOT_DURATION_S,
+            "short_shot_policy": "merge_adjacent_keep_stronger_boundary",
+            "limitations": "硬切自动检测；不足0.5秒的镜头并入相邻镜头，整片不足0.5秒时保留整片。经过黑场的淡入淡出仅为候选。复杂叠化、快速摇镜和闪光可能漏检或误分。分析窗口不代表转场。",
         },
         "time_mapping": "source_relative_seconds",
         "preview_duration_s": preview_meta["duration_s"],

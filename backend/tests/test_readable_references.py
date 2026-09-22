@@ -71,7 +71,7 @@ def archived(client):
         db.add(task)
         db.flush()
         new_id, new_shot = uid(), uid()
-        extra = Asset(id=uid(), project_id=p.id, source_type="real_capture", original_name="extra.mp4", storage_key="extra.mp4", sha256="extra", duration_s=3, width=640, height=360, has_audio=False, status="ready", meta={"scene_shots": [{"id": new_shot, "start_s": 0, "end_s": 3}]})
+        extra = Asset(id=uid(), project_id=p.id, source_type="real_capture", original_name="extra.mp4", storage_key="extra.mp4", sha256="extra", duration_s=3, width=640, height=360, has_audio=False, status="ready", meta={"scene_shots": [{"id": new_shot, "index": 1, "start_s": 0, "end_s": 3, "boundary_type": "start", "keyframes": [{"time_s": 0, "key": "unused.jpg"}]}]})
         db.add(extra)
         db.flush()
         sub = Submission(id=uid(), project_id=p.id, task_id=task.id, asset_id=extra.id, data={"reason": f"新证据 {new_id} 与 '{SHOT}' 连贯", "new_evidence": [{"id": new_id, "shot_id": new_shot, "source_start_s": 0.5, "source_end_s": 2}], "checks": [{"check": f"{SHOT} 交代出口", "reason": f"证据 id: {new_id} 位于 shot_id '{new_shot}'", "evidence_ids": [new_id]}]})
@@ -106,3 +106,35 @@ def test_archived_plan_and_verification_show_times_but_keep_original_acceptance_
     assert sub["checks"][0]["evidence_ids"] == [archived["new_id"]]
     with SessionLocal() as db:
         assert db.get(CompletionTask, archived["task_id"]).data["acceptance_checks"] == [f"{SHOT} 交代出口"]
+
+
+def test_old_short_shots_merge_only_in_display_and_keep_navigation_sources(client, archived):
+    with SessionLocal() as db:
+        run = db.get(AnalysisRun, archived["analysis_id"])
+        asset = db.get(Asset, run.asset_snapshot[0])
+        raw_shots = [
+            {"id": sid, "asset_id": asset.id, "index": i, "start_s": start, "end_s": end,
+             "boundary_type": "hard_cut", "summary": f"画面{i}",
+             "keyframes": [{"time_s": start, "key": "unused.jpg"}]}
+            for i, (sid, start, end) in enumerate([
+                (SECOND, 24.3, 24.4), (SHOT, 24.4, 25.9), (UNKNOWN, 25.9, 26.4),
+            ], 1)
+        ]
+        run.data = {**run.data, "shots": raw_shots}
+        asset.meta = {**asset.meta, "scene_shots": raw_shots, "segmentation_version": "vlog-shots-v2"}
+        project_id, asset_id = asset.project_id, asset.id
+        db.commit()
+
+    data = client.get(f"/api/v1/analyses/{archived['analysis_id']}/diagnosis").json()
+    assert data["shots"] == raw_shots
+    displayed = data["display_shots"]
+    assert [(s["start_s"], s["end_s"]) for s in displayed] == [(24.3, 25.9), (25.9, 26.4)]
+    assert displayed[0]["source_shot_ids"] == [SECOND, SHOT]
+    assert data["gaps"][0]["anchor"]["shot_id"] == SHOT
+    assert "24.4–25.9 秒" in data["gaps"][0]["reason"]
+    assets = client.get(f"/api/v1/projects/{project_id}/assets").json()
+    public_asset = next(a for a in assets if a["id"] == asset_id)
+    assert public_asset["shot_count"] == len(public_asset["shots"]) == 2
+    with SessionLocal() as db:
+        assert db.get(AnalysisRun, archived["analysis_id"]).data["shots"] == raw_shots
+        assert db.get(Asset, asset_id).meta["scene_shots"] == raw_shots

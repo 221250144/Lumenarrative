@@ -50,7 +50,7 @@ from app.schemas import (
 from app.providers.storage import storage
 from app.providers.media_sources import LocalUploadAdapter, Insta360Adapter
 from app.services.media.pipeline import probe
-from app.services.media.views import asset_shots
+from app.services.media.views import asset_shots, merge_short_shots
 from app.services.diagnosis.vlog import select_key_evidence
 from app.services.diagnosis.presentation import ReadableReferences
 from app.services.media.demo import SCENARIOS, create_demo_asset
@@ -145,6 +145,7 @@ def asset_json(asset):
     data.pop("storage_key", None)
     data.pop("sha256", None)
     meta = data.pop("meta")
+    display_shots = merge_short_shots(asset_shots(asset))
     data.update(
         {
             "preview_url": f"/api/v1/assets/{asset.id}/media/preview"
@@ -156,8 +157,8 @@ def asset_json(asset):
             else None,
             "audio_status": meta.get("audio_status", "pending"),
             "synthetic_media": meta.get("synthetic_media", False),
-            "shots": asset_shots(asset),
-            "shot_count": len(meta.get("scene_shots", [])),
+            "shots": display_shots,
+            "shot_count": len(display_shots),
             "segmentation_version": meta.get("segmentation_version"),
         }
     )
@@ -455,6 +456,7 @@ def diagnosis(id: str, db: DB):
         "matches": rows(db, RequirementMatch, id),
         "gaps": gaps,
         "shots": run.data.get("shots", []),
+        "display_shots": merge_short_shots(run.data.get("shots", [])),
         "vlog": run.data.get("vlog"),
     })
 

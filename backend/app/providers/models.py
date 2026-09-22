@@ -19,6 +19,13 @@ log = logging.getLogger("xuguangji.provider")
 PROMPT_VERSION = "vlog-review-v2.0"
 
 
+def model_request_timeout():
+    """Allow long inference without making network connection attempts endless."""
+    return httpx.Timeout(
+        connect=30.0, read=settings.model_timeout_s or None, write=60.0, pool=30.0,
+    )
+
+
 class VLMProvider(Protocol):
     def analyze_clip(self, asset, shot: dict) -> list[dict]: ...
 
@@ -60,20 +67,25 @@ class CompatibleProvider:
             {"role": "user", "content": content},
         ]
         started = time.monotonic()
-        with resource_slot("model", settings.model_concurrency), httpx.Client(timeout=settings.model_timeout_s) as client:
+        with resource_slot("model", settings.model_concurrency), httpx.Client(timeout=model_request_timeout()) as client:
             for repair in range(2):
                 result = None
                 for attempt in range(3):
-                    response = client.post(
-                        settings.model_base_url.rstrip("/") + "/chat/completions",
-                        headers={"Authorization": f"Bearer {settings.model_api_key}"},
-                        json={
-                            "model": model,
-                            "messages": messages,
-                            "temperature": 0.1,
-                            "response_format": {"type": "json_object"},
-                        },
-                    )
+                    try:
+                        response = client.post(
+                            settings.model_base_url.rstrip("/") + "/chat/completions",
+                            headers={"Authorization": f"Bearer {settings.model_api_key}"},
+                            json={
+                                "model": model,
+                                "messages": messages,
+                                "temperature": 0.1,
+                                "response_format": {"type": "json_object"},
+                            },
+                        )
+                    except httpx.ReadTimeout as exc:
+                        raise ValueError(
+                            f"单次模型响应等待超时（当前设置 {settings.model_timeout_s} 秒），请稍后重试；这不是整条分析的总时长限制"
+                        ) from exc
                     if (
                         response.status_code in (429, 500, 502, 503, 504)
                         and attempt < 2
@@ -372,7 +384,7 @@ class CompatibleASR:
             return [], "unconfigured"
         with (
             storage.path(asset.meta["audio_key"]).open("rb") as audio,
-            httpx.Client(timeout=settings.model_timeout_s) as client,
+            httpx.Client(timeout=model_request_timeout()) as client,
         ):
             response = client.post(
                 settings.asr_base_url.rstrip("/") + "/audio/transcriptions",

@@ -49,7 +49,7 @@ export function Workbench({
   const [findingPage, setFindingPage] = useState(0);
   const uploadRef = useRef<HTMLInputElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
-  const diagnosisPanelRef = useRef<HTMLElement>(null);
+  const shotScrollRef = useRef<HTMLDivElement>(null);
   const diagnosisScrollRef = useRef<HTMLDivElement>(null);
   const primary = assets.find(
     (a) => a.id === project.constraints_json.primary_asset_id,
@@ -60,9 +60,10 @@ export function Workbench({
     !!diagnosis?.vlog &&
     !diagnosis.analysis.stale &&
     diagnosis.vlog.primary_asset_id === primary?.id;
+  const analyzedShots = diagnosis?.display_shots ?? diagnosis?.shots;
   const shots = (
-    diagnosisCurrent && diagnosis.shots?.length
-      ? diagnosis.shots
+    diagnosisCurrent && analyzedShots?.length
+      ? analyzedShots
       : primary?.shots || []
   )
     .filter((shot) => shot.asset_id === primary?.id)
@@ -83,41 +84,11 @@ export function Workbench({
     setShotPage(0);
   }, [shots.length, diagnosis?.analysis.id]);
   useEffect(() => {
+    shotScrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [shotPage, primary?.id, diagnosis?.analysis.id]);
+  useEffect(() => {
     diagnosisScrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [tab, findingPage, diagnosis?.analysis.id]);
-  useEffect(() => {
-    const panel = diagnosisPanelRef.current;
-    if (!panel) return;
-    let frame = 0;
-    const resizePanel = () => {
-      frame = 0;
-      if (!window.matchMedia("(min-width: 1251px)").matches) return;
-      const viewport = window.innerHeight;
-      const available =
-        viewport - Math.max(16, panel.getBoundingClientRect().top) - 16;
-      const height = Math.max(Math.min(360, viewport - 32), available);
-      panel.style.setProperty(
-        "--review-panel-height",
-        `${Math.floor(height)}px`,
-      );
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(resizePanel);
-    };
-    const observer = new ResizeObserver(schedule);
-    // Notices above the workspace can change the available height after load.
-    const content = panel.closest(".main-content");
-    if (content) observer.observe(content);
-    window.addEventListener("resize", schedule);
-    window.addEventListener("scroll", schedule, { passive: true });
-    resizePanel();
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", schedule);
-      window.removeEventListener("scroll", schedule);
-      cancelAnimationFrame(frame);
-    };
-  }, []);
   const jumpTo = (
     assetId: string,
     start: number,
@@ -126,7 +97,13 @@ export function Workbench({
   ) => {
     setSelected(assetId);
     setSeek({ at: start, end, nonce: Date.now(), label });
-    playerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (
+      !window.matchMedia("(min-width: 1251px) and (min-height: 700px)").matches
+    )
+      playerRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
   };
   const jump = (e: Evidence) =>
     jumpTo(e.asset_id, e.source_start_s, e.source_end_s, "关键证据回看");
@@ -164,7 +141,7 @@ export function Workbench({
     onUpload(files, "edited_video");
   };
   return (
-    <>
+    <div className="vlog-workspace">
       <div className="workspace-title">
         <div>
           <span className="eyebrow">VLOG REVIEW WORKSPACE</span>
@@ -377,126 +354,150 @@ export function Workbench({
           </div>
           <section className="shot-section">
             <div className="panel-title">
-              <h3>
+              <h3 id="vlog-shots-title">
                 <Icon name="layers" />
                 镜头切分 <span>{shots.length}</span>
               </h3>
               <span>按原片顺序 · 点击回看</span>
             </div>
-            {!!shots.length && (
-              <p className="shot-explanation">
-                按转场和画面变化自动检测切点，连续长镜头保留完整。切点供审看参考，原视频不会被改动。
-              </p>
-            )}
-            {shots.length ? (
-              <>
-                {diagnosisCurrent && !!diagnosis.vlog?.chapters.length && (
-                  <div className="vlog-chapters">
-                    {diagnosis.vlog.chapters.map((chapter, i) => (
-                      <button
-                        className="chapter-chip"
-                        key={`${chapter.title}-${i}`}
-                        title={chapter.summary}
-                        onClick={() => {
-                          const index = shots.findIndex((shot) =>
-                            chapter.shot_ids.includes(shot.id),
-                          );
-                          if (index >= 0) {
-                            setShotPage(Math.floor(index / PAGE_SIZE));
-                            jumpShot(shots[index]);
+            <div className="review-scroll-hint shot-scroll-hint">
+              <span>
+                <span aria-hidden="true">↕</span> 独立滚动镜头列表
+              </span>
+              <small>点击镜头回看</small>
+            </div>
+            <div
+              className="shot-scroll"
+              ref={shotScrollRef}
+              tabIndex={0}
+              role="region"
+              aria-labelledby="vlog-shots-title"
+            >
+              {!!shots.length && (
+                <p className="shot-explanation">
+                  按转场切分，不足0.5秒的片段已并入相邻镜头，原视频不变。
+                </p>
+              )}
+              {shots.length ? (
+                <>
+                  {diagnosisCurrent && !!diagnosis.vlog?.chapters.length && (
+                    <details className="chapter-picker">
+                      <summary>
+                        按章节定位{" "}
+                        <span>{diagnosis.vlog.chapters.length} 个章节</span>
+                      </summary>
+                      <div className="vlog-chapters">
+                        {diagnosis.vlog.chapters.map((chapter, i) => (
+                          <button
+                            className="chapter-chip"
+                            key={`${chapter.title}-${i}`}
+                            title={chapter.summary}
+                            onClick={(event) => {
+                              const index = shots.findIndex(
+                                (shot) =>
+                                  chapter.shot_ids.includes(shot.id) ||
+                                  shot.source_shot_ids?.some((id) =>
+                                    chapter.shot_ids.includes(id),
+                                  ),
+                              );
+                              if (index >= 0) {
+                                setShotPage(Math.floor(index / PAGE_SIZE));
+                                jumpShot(shots[index]);
+                                event.currentTarget
+                                  .closest("details")
+                                  ?.removeAttribute("open");
+                              }
+                            }}
+                          >
+                            {String(i + 1).padStart(2, "0")} {chapter.title}
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                  <div className="shot-list">
+                    {shots
+                      .slice(shotPage * PAGE_SIZE, (shotPage + 1) * PAGE_SIZE)
+                      .map((shot, i) => (
+                        <button
+                          className={
+                            "shot-row " +
+                            (active?.id === shot.asset_id &&
+                            seek?.at === shot.start_s &&
+                            seek.end === shot.end_s
+                              ? "selected"
+                              : "")
                           }
-                        }}
-                      >
-                        {String(i + 1).padStart(2, "0")} {chapter.title}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="shot-list">
-                  {shots
-                    .slice(shotPage * PAGE_SIZE, (shotPage + 1) * PAGE_SIZE)
-                    .map((shot, i) => (
-                      <button
-                        className={
-                          "shot-row " +
-                          (active?.id === shot.asset_id &&
-                          seek?.at === shot.start_s &&
-                          seek.end === shot.end_s
-                            ? "selected"
-                            : "")
-                        }
-                        key={shot.id}
-                        onClick={() => jumpShot(shot)}
-                      >
-                        <div className="shot-thumbnail">
-                          {shot.thumbnail_url ? (
-                            <img
-                              src={shot.thumbnail_url}
-                              alt=""
-                              loading="lazy"
-                            />
-                          ) : (
-                            <Icon name="film" />
-                          )}
-                          <span>
-                            {String(shotPage * PAGE_SIZE + i + 1).padStart(
-                              2,
-                              "0",
+                          key={shot.id}
+                          onClick={() => jumpShot(shot)}
+                        >
+                          <div className="shot-thumbnail">
+                            {shot.thumbnail_url ? (
+                              <img
+                                src={shot.thumbnail_url}
+                                alt=""
+                                loading="lazy"
+                              />
+                            ) : (
+                              <Icon name="film" />
                             )}
-                          </span>
-                        </div>
-                        <div className="shot-copy">
-                          <strong>
-                            {shot.summary ||
-                              (shot.observed === false
-                                ? "这个镜头尚未完成画面理解"
-                                : `镜头 ${shotPage * PAGE_SIZE + i + 1}`)}
-                          </strong>
-                          <span className="mono">
-                            {preciseTime(shot.start_s)} —{" "}
-                            {preciseTime(shot.end_s)}{" "}
+                            <span>
+                              {String(shotPage * PAGE_SIZE + i + 1).padStart(
+                                2,
+                                "0",
+                              )}
+                            </span>
+                          </div>
+                          <div className="shot-copy">
+                            <strong>
+                              {shot.summary ||
+                                (shot.observed === false
+                                  ? "这个镜头尚未完成画面理解"
+                                  : `镜头 ${shotPage * PAGE_SIZE + i + 1}`)}
+                            </strong>
+                            <span className="mono">
+                              {preciseTime(shot.start_s)} —{" "}
+                              {preciseTime(shot.end_s)}{" "}
+                              <small>
+                                {(shot.end_s - shot.start_s).toFixed(1)} 秒
+                              </small>
+                            </span>
                             <small>
-                              {(shot.end_s - shot.start_s).toFixed(1)} 秒
+                              {shot.boundary_type === "start"
+                                ? "原片开头"
+                                : shot.boundary_type === "fade_candidate"
+                                  ? "渐变转场候选 · 请回看核实"
+                                  : "画面切换"}
+                              {shot.observed === false ? " · 待核实" : ""}
                             </small>
-                          </span>
-                          <small>
-                            {shot.boundary_type === "start"
-                              ? "原片开头"
-                              : shot.boundary_type === "fade_candidate"
-                                ? "渐变转场候选 · 请回看核实"
-                                : "画面切换"}
-                            {shot.observed === false ? " · 待核实" : ""}
-                          </small>
-                        </div>
-                        <Icon name="play" size={15} />
-                      </button>
-                    ))}
+                          </div>
+                          <Icon name="play" size={15} />
+                        </button>
+                      ))}
+                  </div>
+                </>
+              ) : (
+                <div className="inline-empty">
+                  {!primary
+                    ? "先上传或选择一条 Vlog，处理完成后会按原片顺序展示镜头。"
+                    : primary.status !== "ready"
+                      ? "正在读取视频并检测转场，处理完成后自动展示镜头。"
+                      : "这条视频还没有新版切分结果。点击“分析这条 Vlog”，生成镜头切分与具体建议。"}
                 </div>
-                {shots.length > PAGE_SIZE && (
-                  <Pagination
-                    page={shotPage}
-                    total={shots.length}
-                    size={PAGE_SIZE}
-                    onPage={setShotPage}
-                    noun="镜头"
-                  />
-                )}
-              </>
-            ) : (
-              <div className="inline-empty">
-                {!primary
-                  ? "先上传或选择一条 Vlog，处理完成后会按原片顺序展示镜头。"
-                  : primary.status !== "ready"
-                    ? "正在读取视频并检测转场，处理完成后自动展示镜头。"
-                    : "这条视频还没有新版切分结果。点击“分析这条 Vlog”，生成镜头切分与具体建议。"}
-              </div>
+              )}
+            </div>
+            {shots.length > PAGE_SIZE && (
+              <Pagination
+                page={shotPage}
+                total={shots.length}
+                size={PAGE_SIZE}
+                onPage={setShotPage}
+                noun="镜头"
+              />
             )}
           </section>
         </div>
-        <aside
-          className="diagnosis-panel vlog-diagnosis"
-          ref={diagnosisPanelRef}
-        >
+        <aside className="diagnosis-panel vlog-diagnosis">
           <div className="panel-title">
             <h3 id="vlog-diagnosis-title">
               <Icon name="spark" />
@@ -527,7 +528,10 @@ export function Workbench({
               审看依据
             </button>
           </div>
-          <div className="diagnosis-scroll-hint" id="diagnosis-scroll-hint">
+          <div
+            className="review-scroll-hint diagnosis-scroll-hint"
+            id="diagnosis-scroll-hint"
+          >
             <span>
               <span aria-hidden="true">↕</span> 在这里上下滚动查看建议
             </span>
@@ -628,7 +632,7 @@ export function Workbench({
                         key={g.id}
                         gap={g}
                         evidence={diagnosis.evidence}
-                        shots={diagnosis.shots || []}
+                        shots={diagnosis.display_shots ?? diagnosis.shots ?? []}
                         jump={jump}
                         jumpTo={jumpTo}
                         onChange={onGap}
@@ -688,7 +692,7 @@ export function Workbench({
           )}
         </aside>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -828,7 +832,11 @@ function GapCard({
   const originalCount = new Set(
     g.evidence_ids.filter((id) => evidence.some((e) => e.id === id)),
   ).size;
-  const shotIndex = shots.findIndex((shot) => shot.id === g.anchor?.shot_id);
+  const shotIndex = shots.findIndex(
+    (shot) =>
+      shot.id === g.anchor?.shot_id ||
+      shot.source_shot_ids?.includes(g.anchor?.shot_id || ""),
+  );
   const recommendation = g.recommendation;
   return (
     <article
