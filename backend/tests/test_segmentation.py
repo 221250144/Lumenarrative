@@ -9,7 +9,7 @@ import pytest
 
 from app.config import settings
 from app.providers.storage import storage
-from app.services.media.pipeline import SEGMENTATION_VERSION, dense_frames, preprocess, probe, run
+from app.services.media.pipeline import SEGMENTATION_VERSION, dense_frames, preprocess, probe, run, _extract_selected_frames, _scan_frames
 
 
 pytestmark = pytest.mark.skipif(
@@ -101,6 +101,21 @@ def test_hard_cuts_are_contiguous_source_shots_with_correct_frames(media_root):
         for frame in shot["keyframes"]:
             rgb = average_rgb(frame["key"])
             assert rgb[channel] > max(rgb[index] for index in range(3) if index != channel) + 70
+
+
+def test_large_selection_extracts_exact_frames_without_expression_depth_failure(media_root):
+    asset = make_asset(media_root, [("red", 3, ""), ("blue", 3, "")])
+    source = storage.path(asset.storage_key)
+    frames, _ = _scan_frames(source)
+    selected = list(range(150))
+    result = _extract_selected_frames(source, source.parent, frames, selected)
+    assert list(result) == selected
+    assert len({item["key"] for item in result.values()}) == 150
+    assert all(storage.path(item["key"]).is_file() for item in result.values())
+    for index, channel in [(0, 0), (74, 0), (75, 2), (149, 2)]:
+        assert result[index]["time_s"] == pytest.approx(index / 25)
+        rgb = average_rgb(result[index]["key"])
+        assert rgb[channel] > max(rgb[i] for i in range(3) if i != channel) + 70
 
 
 def test_subsecond_montage_never_loses_short_shot_images(media_root):

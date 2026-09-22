@@ -241,6 +241,16 @@ def _sample_indices(frames, start, end, limit=4):
     return [available[round(i * (len(available) - 1) / (count - 1))] for i in range(count)]
 
 
+def _frame_selection(indices):
+    """Bound expression depth for FFmpeg's evaluator on long montages."""
+    if not indices:
+        return "0"
+    if len(indices) == 1:
+        return f"eq(n,{indices[0]})"
+    middle = len(indices) // 2
+    return f"({_frame_selection(indices[:middle])}+{_frame_selection(indices[middle:])})"
+
+
 def _extract_selected_frames(proxy, folder, frames, selected):
     """One pass, exact frame indices, isolated outputs on every retry."""
     generation = hashlib.sha256(":".join(map(str, selected)).encode()).hexdigest()[:16]
@@ -252,7 +262,7 @@ def _extract_selected_frames(proxy, folder, frames, selected):
         output.mkdir()
         filter_file = scratch / "select.txt"
         # A filter script avoids command-line length limits on long montages.
-        selection = "+".join(f"eq(n,{index})" for index in selected)
+        selection = _frame_selection(selected)
         filter_file.write_text(f"select='{selection}',scale=640:-2")
         args = [
             settings.ffmpeg_bin, "-y", "-v", "error", "-i", str(proxy),
