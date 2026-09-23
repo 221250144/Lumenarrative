@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from app.api import routes
-from app.models import SessionLocal, Project, AnalysisRun, Asset, EditVersion, Job, uid, serialize
+from app.models import SessionLocal, User, Project, AnalysisRun, Asset, EditVersion, Job, uid, serialize
 from app.providers.storage import storage
 from app.workers.queue import execute
 
@@ -13,7 +13,8 @@ from app.workers.queue import execute
 @pytest.fixture
 def history(client):
     with SessionLocal() as db:
-        project = Project(id=uid(), title="Existing project", intent="Review a Vlog", revision=3)
+        owner_id = db.scalar(select(User.id).where(User.username == "tester"))
+        project = Project(id=uid(), owner_id=owner_id, title="Existing project", intent="Review a Vlog", revision=3)
         db.add(project)
         db.flush()
         analysis = AnalysisRun(id=uid(), project_id=project.id, project_revision=3, asset_snapshot=[], config_hash="historic", status="succeeded", data={})

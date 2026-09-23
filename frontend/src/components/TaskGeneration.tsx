@@ -160,10 +160,12 @@ export function TaskGeneration({
   }, [pendingIds, endpoint]);
 
   async function reload() {
+    if (!alive.current) throw new DOMException("会话已关闭", "AbortError");
     const [config, history] = await Promise.all([
       api<GenerationOptions>(`${endpoint}/generation-options`),
       api<Job[]>(`${endpoint}/generations`),
     ]);
+    if (!alive.current) throw new DOMException("会话已关闭", "AbortError");
     setOptions(config);
     setJobs(history);
     return config;
@@ -209,7 +211,9 @@ export function TaskGeneration({
         body,
         intent.key,
       );
+      if (!alive.current) return;
       const job = await api<Job>(`/jobs/${result.job_id}`);
+      if (!alive.current) return;
       pendingIntent.current = null;
       try {
         sessionStorage.removeItem(storageKey);
@@ -223,6 +227,7 @@ export function TaskGeneration({
       setSelectedResult("");
       await refreshRef.current();
     } catch (e) {
+      if (!alive.current) return;
       setError(e instanceof Error ? e.message : "提交生成任务失败");
       await reload().catch(() => {});
     } finally {
@@ -238,9 +243,12 @@ export function TaskGeneration({
     setError("");
     try {
       await post(`/jobs/${job.id}/retry`);
+      if (!alive.current) return;
       await reload();
+      if (!alive.current) return;
       await refreshRef.current();
     } catch (e) {
+      if (!alive.current) return;
       setError(e instanceof Error ? e.message : "重试生成任务失败");
       await reload().catch(() => {});
     } finally {

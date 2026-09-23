@@ -1,7 +1,6 @@
 from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
 
 from app.api.routes import DB, Key, get, request_fingerprint, repeated, remember, commit_request, job_for
 from app.config import settings
@@ -75,14 +74,16 @@ def generations(id: str, db: DB):
 def generate(id: str, body: GenerationCreate, db: DB, idempotency_key: Key = None):
     if not idempotency_key or not idempotency_key.strip():
         raise HTTPException(400, "视频生成必须提供 Idempotency-Key 以避免重复计费")
-    task = get(db, CompletionTask, id)
+    task = get(db, CompletionTask, id, lock=False)
     project_id = task.project_id
     scope, fingerprint = f"generation:{id}", request_fingerprint(body.model_dump())
     # POSIX lock also serializes local SQLite requests; PostgreSQL row lock protects
     # quota reservations against uploads and other writers across API workers.
     db.rollback()
     with resource_slot("generation-project-" + project_id, 1):
-        db.scalar(select(Project).where(Project.id == project_id).with_for_update())
+        # Revalidate ownership and deletion after acquiring the lock. A project
+        # may have been deleted while this request waited for another upload.
+        get(db, Project, project_id, lock=True)
         if previous := repeated(db, scope, idempotency_key, fingerprint):
             return previous
         try:

@@ -8,6 +8,7 @@ from app.models import SessionLocal, Job, uid
 from app.config import settings
 from app.api.routes import router
 from app.api.generation import router as generation_router
+from app.auth import router as auth_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -31,14 +32,21 @@ async def lifespan(app):
 app = FastAPI(title="旭光集 API", version="0.1.0", lifespan=lifespan)
 app.include_router(router)
 app.include_router(generation_router)
+app.include_router(auth_router)
 
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):
     request.state.request_id = uid()
+    if (request.url.path.startswith("/api/v1/")
+            and request.method not in ("GET", "HEAD", "OPTIONS")
+            and request.headers.get("X-Requested-With") != "XMLHttpRequest"):
+        return error(request, "CSRF_REJECTED", "请从当前页面发起操作", 403)
     response = await call_next(request)
     response.headers["X-Request-ID"] = request.state.request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
+    if request.url.path.startswith("/api/v1/"):
+        response.headers["Cache-Control"] = "private, no-store"
     return response
 
 

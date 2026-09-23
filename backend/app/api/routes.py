@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Literal
 from fastapi import (
@@ -19,6 +20,7 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from app.auth import authenticated_session, resolve_user
 from app.config import settings
 from app.models import (
     SessionLocal,
@@ -71,19 +73,41 @@ def editing_retired():
     raise HTTPException(410, EDITING_RETIRED_MESSAGE)
 
 
-def session():
-    with SessionLocal() as db:
-        yield db
-
-
-DB = Annotated[Session, Depends(session)]
+DB = Annotated[Session, Depends(authenticated_session)]
 Key = Annotated[str | None, Header(alias="Idempotency-Key", max_length=200)]
 
 
-def get(db, cls, id):
+def owned_project(db, id, *, lock=None):
+    user_id = db.info.get("user_id")
+    if not user_id:
+        raise HTTPException(401, "请先登录")
+    if lock is None:
+        lock = db.info.get("request_method", "GET") not in ("GET", "HEAD", "OPTIONS")
+    conditions = (
+        Project.id == id,
+        Project.owner_id == user_id,
+        Project.deleted_at.is_(None),
+    )
+    # PostgreSQL coordinates delete with every project mutation. SQLite ignores
+    # FOR UPDATE, so an unchanged UPDATE acquires its write lock before the read.
+    if lock and db.get_bind().dialect.name == "sqlite":
+        db.execute(update(Project).where(*conditions).values(revision=Project.revision))
+    query = select(Project).where(*conditions).execution_options(populate_existing=True)
+    if lock:
+        query = query.with_for_update()
+    project = db.scalar(query)
+    if not project:
+        raise HTTPException(404, "对象不存在")
+    return project
+
+
+def get(db, cls, id, *, lock=None):
+    if cls is Project:
+        return owned_project(db, id, lock=lock)
     row = db.get(cls, id)
     if not row:
         raise HTTPException(404, "对象不存在")
+    owned_project(db, row.project_id, lock=lock)
     return row
 
 
@@ -109,11 +133,15 @@ def request_fingerprint(payload):
     ).hexdigest()
 
 
+def user_scope(db, scope):
+    return f"user:{db.info['user_id']}:{scope}"
+
+
 def repeated(db, scope, key, fingerprint):
     if not key:
         return None
     entry = db.scalar(
-        select(Idempotency).where(Idempotency.scope == scope, Idempotency.key == key)
+        select(Idempotency).where(Idempotency.scope == user_scope(db, scope), Idempotency.key == key)
     )
     if entry and entry.fingerprint != fingerprint:
         raise HTTPException(409, "同一幂等键不能用于不同请求")
@@ -124,7 +152,7 @@ def remember(db, scope, key, fingerprint, response):
     if key:
         db.add(
             Idempotency(
-                scope=scope, key=key, fingerprint=fingerprint, response=response
+                scope=user_scope(db, scope), key=key, fingerprint=fingerprint, response=response
             )
         )
 
@@ -210,7 +238,9 @@ def capabilities():
 @router.get("/projects")
 def projects(db: DB):
     result = []
-    for p in db.scalars(select(Project).order_by(Project.created_at.desc())):
+    for p in db.scalars(select(Project).where(
+        Project.owner_id == db.info["user_id"], Project.deleted_at.is_(None),
+    ).order_by(Project.created_at.desc())):
         assets = db.scalars(
             select(Asset).where(Asset.project_id == p.id).order_by(Asset.created_at)
         ).all()
@@ -234,7 +264,7 @@ def projects(db: DB):
 
 @router.post("/projects", status_code=201)
 def create_project(body: ProjectCreate, db: DB):
-    p = Project(**body.model_dump())
+    p = Project(**body.model_dump(), owner_id=db.info["user_id"])
     db.add(p)
     db.commit()
     return serialize(p)
@@ -250,10 +280,12 @@ def patch_project(id: str, body: ProjectPatch, db: DB):
     p = get(db, Project, id)
     data = body.model_dump(exclude_none=True)
     primary = data.pop("primary_asset_id", None)
+    analysis_changed = any(k != "title" and getattr(p, k) != v for k, v in data.items())
     if primary:
-        asset = get(db, Asset, primary)
+        asset = get(db, Asset, primary, lock=False)
         if asset.project_id != id:
             raise HTTPException(404, "素材不属于本项目")
+        analysis_changed = analysis_changed or p.constraints_json.get("primary_asset_id") != primary
         p.constraints_json = {**p.constraints_json, "primary_asset_id": primary}
     if "intent" in data and data["intent"] != p.intent:
         p.constraints_json = {
@@ -263,9 +295,23 @@ def patch_project(id: str, body: ProjectPatch, db: DB):
         }
     for k, v in data.items():
         setattr(p, k, v)
-    bump(p)
+    if analysis_changed:
+        bump(p)
     db.commit()
     return serialize(p)
+
+
+@router.delete("/projects/{id}")
+def delete_project(id: str, db: DB):
+    p = get(db, Project, id)
+    pending_job = db.scalar(select(Job.id).where(
+        Job.project_id == id, Job.status.in_(("queued", "running")),
+    ).limit(1))
+    if pending_job:
+        raise HTTPException(409, "项目仍有任务正在处理，请等待完成后再删除")
+    p.deleted_at = datetime.now(timezone.utc).isoformat()
+    db.commit()
+    return {"id": id, "deleted": True}
 
 
 @router.get("/projects/{id}/assets")
@@ -289,7 +335,7 @@ async def upload_asset(
     ] = Form("unknown"),
     idempotency_key: Key = None,
 ):
-    p = get(db, Project, id)
+    p = get(db, Project, id, lock=False)
     aid = uid()
     folder = storage.path(f"assets/{id}/{aid}")
     folder.mkdir(parents=True, exist_ok=True)
@@ -318,12 +364,7 @@ async def upload_asset(
         meta = await asyncio.to_thread(probe, target)
         with resource_slot("generation-project-" + id, 1):
             # Serialize limits/revision mutations in PostgreSQL. Local mode runs one API process.
-            p = db.scalar(
-                select(Project)
-                .where(Project.id == id)
-                .with_for_update()
-                .execution_options(populate_existing=True)
-            )
+            p = get(db, Project, id, lock=True)
             previous = repeated(db, f"upload:{id}", idempotency_key, fingerprint)
             if previous:
                 shutil.rmtree(folder)
@@ -414,7 +455,7 @@ def start_analysis(id: str, db: DB, idempotency_key: Key = None):
     if idempotency_key:
         old = db.scalar(
             select(Idempotency).where(
-                Idempotency.scope == f"analysis:{id}",
+                Idempotency.scope == user_scope(db, f"analysis:{id}"),
                 Idempotency.key == idempotency_key,
             )
         )
@@ -511,7 +552,8 @@ def patch_gap(id: str, body: GapPatch, db: DB):
 
 @router.post("/projects/{id}/completion-plans", status_code=201)
 def start_plan(id: str, body: PlanCreate, db: DB):
-    run = get(db, AnalysisRun, body.analysis_id)
+    get(db, Project, id)
+    run = get(db, AnalysisRun, body.analysis_id, lock=False)
     p = check_current(db, run, id)
     result = plan_tasks(
         rows(db, Gap, run.id),
@@ -587,7 +629,7 @@ def list_plans(id: str, db: DB):
 @router.post("/completion-tasks/{id}/submissions", status_code=202)
 def submit(id: str, body: SubmissionCreate, db: DB, idempotency_key: Key = None):
     task = get(db, CompletionTask, id)
-    asset = get(db, Asset, body.asset_id)
+    asset = get(db, Asset, body.asset_id, lock=False)
     if asset.project_id != task.project_id:
         raise HTTPException(404, "素材不属于任务项目")
     fingerprint = request_fingerprint(body.model_dump())
@@ -767,13 +809,22 @@ def list_jobs(id: str, db: DB):
 @router.get("/jobs/{id}/events")
 async def job_events(id: str, request: Request):
     with SessionLocal() as db:
+        user = resolve_user(request, db)
+        db.info["user_id"] = user.id
         get(db, Job, id)
 
     async def events():
         last = None
         while not await request.is_disconnected():
             with SessionLocal() as db:
-                row = get_job(id, db)
+                # A long-lived stream must stop after logout/session expiry or
+                # project deletion, rather than relying only on its first read.
+                try:
+                    user = resolve_user(request, db)
+                    db.info["user_id"] = user.id
+                    row = get_job(id, db)
+                except HTTPException:
+                    break
             payload = json.dumps(row, ensure_ascii=False)
             if payload != last:
                 yield f"id: {hashlib.sha256(payload.encode()).hexdigest()[:16]}\ndata: {payload}\n\n"
@@ -800,6 +851,9 @@ def retry_job(id: str, db: DB):
         if job.type == "generation":
             # A live worker owns a per-job OS lock and ignores duplicate delivery.
             # A dead worker's running job can resume from its saved provider ID.
+            # Release the project lock before the worker opens its transaction;
+            # the queued/running job itself continues to prevent project deletion.
+            db.commit()
             dispatch(job.id)
         return job_json(job)
     if job.status != "failed":
@@ -825,6 +879,7 @@ def demo(db: DB, scenario: str = "missing"):
         raise HTTPException(422, "未知演示案例")
     p = Project(
         id=uid(),
+        owner_id=db.info["user_id"],
         title={
             "missing": "一杯咖啡的午后",
             "complete": "完整故事 · 演示",

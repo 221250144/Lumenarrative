@@ -1,7 +1,8 @@
 from copy import deepcopy
 import pytest
+from sqlalchemy import select
 
-from app.models import SessionLocal, Project, Asset, AnalysisRun, Evidence, Gap, CompletionPlan, CompletionTask, Submission, uid
+from app.models import SessionLocal, User, Project, Asset, AnalysisRun, Evidence, Gap, CompletionPlan, CompletionTask, Submission, uid
 from app.services.diagnosis.presentation import ReadableReferences
 
 
@@ -83,7 +84,8 @@ def test_time_display_keeps_original_numeric_coordinates_and_stored_text():
 @pytest.fixture
 def archived(client):
     with SessionLocal() as db:
-        p = Project(id=uid(), title="历史结果", intent="记录旅行", revision=1)
+        owner_id = db.scalar(select(User.id).where(User.username == "tester"))
+        p = Project(id=uid(), owner_id=owner_id, title="历史结果", intent="记录旅行", revision=1)
         db.add(p)
         db.flush()
         asset = Asset(id=uid(), project_id=p.id, source_type="edited_video", original_name="vlog.mp4", storage_key="not-needed.mp4", sha256="test", duration_s=70, width=640, height=360, has_audio=False, status="ready")

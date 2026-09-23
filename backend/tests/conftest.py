@@ -21,5 +21,10 @@ def client(monkeypatch):
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     monkeypatch.setattr(routes, "dispatch", execute)
+    from app.auth import _attempts
+    _attempts.clear()
     with TestClient(app) as client:
+        client.headers["X-Requested-With"] = "XMLHttpRequest"
+        response = client.post("/api/v1/auth/register", json={"username": "tester", "password": "test-password-123"})
+        assert response.status_code == 201, response.text
         yield client

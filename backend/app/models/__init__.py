@@ -27,8 +27,24 @@ class Base(DeclarativeBase):
     )
 
 
+class User(Base):
+    __tablename__ = "users"
+    username: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(256))
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[float] = mapped_column(Float, index=True)
+
+
 class Project(Base):
     __tablename__ = "projects"
+    # Legacy projects are assigned explicitly by the owner migration command.
+    owner_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    deleted_at: Mapped[str | None] = mapped_column(String, nullable=True)
     title: Mapped[str] = mapped_column(String(200))
     intent: Mapped[str] = mapped_column(Text)
     target_duration_s: Mapped[int] = mapped_column(Integer, default=60)

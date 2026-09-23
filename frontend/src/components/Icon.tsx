@@ -1,4 +1,5 @@
 const paths: Record<string, string> = {
+  user: "M20 21v-2a7 7 0 0 0-14 0v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8",
   sun: "M4 17a8 8 0 0 1 16 0M3 21h18M12 2v3M3 7l2 2M21 7l-2 2",
   grid: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z",
   film: "M4 3h16v18H4zM4 8h16M4 16h16M8 3v18M16 3v18",

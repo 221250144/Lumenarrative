@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     db_max_overflow: int = Field(default=2, ge=0, le=10)
     data_dir: Path = Path("./data")
     queue_mode: str = "local"
+    auth_session_days: int = Field(default=14, ge=1, le=90)
+    auth_cookie_secure: bool = False
     redis_url: str = "redis://localhost:6379/0"
     model_provider: str = "mock"
     model_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"

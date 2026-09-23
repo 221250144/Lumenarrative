@@ -5,11 +5,11 @@
 ## 当前状态
 
 - 前端生产构建、FastAPI、PostgreSQL 16、Redis 7、Celery 和 FFmpeg 已部署。Nginx、数据库、Redis、API 和 worker 已启用开机自启。
-- 当前代码来自主分支 `main`，版本为 `53f2e6d520f0d72a0767baaecbab8a632af3eb3f`。本次移除建议卡片的“观察到什么”“哪里不清楚”小标题，保留分析正文；提示词区分叠加字幕、实体上的文字和实际画面；用户可读时间最多一位小数，原始播放定位保持精度。主分支另有的 PPT 更新已合并保留。
+- 当前代码来自主分支 `main`，发布目录为 `accounts-20260923`。本次新增注册、登录、退出、修改密码，项目与素材/任务按用户隔离，项目卡片支持重命名和确认删除。11 个旧项目已保留并归属 `caozheng`；首次密码仅保存于本地比赛目录的私密账号文件，没有写入仓库。
 - 提示词版本更新为 `vlog-review-v2.1`，参与分析配置及视觉证据缓存键。旧结果保留、读取时自动缩短时间格式；字幕误判需要用户重新发起分析，不能复用旧视觉证据。此次发布未自动执行收费分析或生成。
 - 视频采样帧理解与新素材视觉验收为 `qwen3.8-max`，全片文字审阅为 `qwen-plus`。此前服务器真实图片请求返回一条通过 schema 校验的证据，用时 39.467 秒；此检查不代表质量或并发性能基准。本次合并未重新执行付费分析、生成或验收。
-- 本次后端在本地及服务器 Linux 均通过 192 项测试，前端 TypeScript 检查与 Vite 构建通过。模型语义效果尚未重新实测；提示词修正已发布，不等于所有字幕误判已经消除。
-- 按用户要求使用 `http://47.110.79.237`，不跳转 HTTPS，不要求账号密码。公网页面、健康检查和项目接口均已通过当前电脑的系统代理返回 HTTP 200；Edge 浏览器也已实际打开页面。
+- 本次后端在本地及服务器 Linux 均通过 213 项测试，前端 TypeScript 检查与 Vite 构建通过；Edge 桌面及手机预览验证账号隔离、项目改名和删除。没有执行付费模型调用。
+- 保持 `http://47.110.79.237`，不跳转 HTTPS。网页使用应用账号登录；Nginx Basic Auth 仍关闭。公网页面和健康检查返回 200，未登录的项目接口返回 401。
 - 当前电脑绕过代理的直连测试仍超时，这与浏览器实际可访问的结果不同，不能据此认定安全组未放行。若某个网络无法访问，应分别检查客户端网络路径和服务器入口。
 - 数据库、Redis、后端与管理预览端口只监听回环地址。模型密钥只在受保护的服务端配置中。
 - HTTPS 与证书续期未启用；仓库保留可选脚本，只有后续明确改用 HTTPS 时再执行。
@@ -19,7 +19,7 @@
 |路径或服务|用途|
 |---|---|
 |`/opt/xuguangji/current`|指向当前发布目录的符号链接|
-|`/opt/xuguangji/releases/subtitle-grounding-20260923-53f2e6d`|当前主分支代码，字幕区分、时间格式及卡片小标题调整|
+|`/opt/xuguangji/releases/accounts-20260923`|当前主分支代码，账号隔离与项目管理|
 |`/opt/xuguangji/venv`|Python 3.12 运行环境|
 |`/opt/xuguangji/certbot`|Certbot 5.8.0 独立环境|
 |`/etc/xuguangji/app.env`|数据库与百炼配置，`root:xuguangji`、`0640`|
@@ -40,7 +40,7 @@ ssh -i _NJU_Token.pem -N \
   root@47.110.79.237
 ```
 
-浏览器打开 `http://127.0.0.1:18080` 即可，无需登录。隧道必须保持运行；这个 localhost 地址只有建立隧道的电脑可以使用。普通使用直接访问公网 HTTP 地址即可，无需建立隧道。
+浏览器打开 `http://127.0.0.1:18080`，使用应用账号登录。隧道必须保持运行；这个 localhost 地址只有建立隧道的电脑可以使用。普通使用直接访问公网 HTTP 地址即可，无需建立隧道。
 
 ## HTTP 配置
 
@@ -79,9 +79,9 @@ systemctl restart xuguangji-api xuguangji-worker
 systemctl list-timers xuguangji-cert-renew.timer
 ```
 
-修改 `/etc/xuguangji/app.env` 后重启 API 和 worker。网页入口不使用账号密码。
+修改 `/etc/xuguangji/app.env` 后重启 API 和 worker。网页入口使用应用账号；注册和密码维护见 [账号与项目管理](ACCOUNTS.md)。
 
-代码更新使用新的 release 目录，上传源代码和 `frontend/dist`，安装 Linux 锁文件中的依赖，链接受保护的 `.env`，执行 Alembic 迁移，再切换 `current` 并重启两个服务。更新前应等正在执行的作业结束，并备份 PostgreSQL 与 `/var/lib/xuguangji/media`；回退代码不能代替数据库恢复。当前未配置异地备份或业务监控告警。
+代码更新使用新的 release 目录，上传源代码和 `frontend/dist`，安装 Linux 锁文件中的依赖，链接受保护的 `.env`，执行 Alembic 迁移，再切换 `current` 并重启两个服务。更新前应等正在执行的作业结束，并备份 PostgreSQL 与 `/var/lib/xuguangji/media`；回退代码不能代替数据库恢复。当前未配置异地备份或业务监控告警。账号迁移前 PostgreSQL 完整备份位于 `/opt/xuguangji/backups/accounts-20260923-075536/database.dump`；同目录保留配置和上一发布路径。项目删除为软删除，不移除底层媒体文件。
 
 纯前端发布可省去上述依赖安装、数据库迁移与服务重启：先确认新提交的后端、部署配置和依赖与运行版本完全一致，再将已验证的构建放入新 release，保留上一版哈希静态资源，并原子切换 `current`。Nginx 继续从该路径提供新前端，既有 API 和 worker 进程不受影响；回退时原子切回旧目录。
 
@@ -99,6 +99,8 @@ uv pip compile backend/requirements.in --python-version 3.12 \
 本次服务器的软件镜像缺失部分锁定版本，访问官方 PyPI 也有超时，因此在开发机从官方 PyPI 下载 Linux wheel，通过 SSH 上传后使用 `pip install --no-index --find-links` 安装。安装后 `pip check` 无缺失或冲突。Dockerfile 同样改用 Linux 锁文件，但 Docker 构建路径尚未实机验收。
 
 ## 实际验证
+
+- `accounts-20260923`：本地及 Linux 均 213 项测试通过。旧 PostgreSQL 迁移至 `0002`，11 个项目保留并显式分配给 `caozheng`。线上验证未登录 401、登录后项目列表及视频 Range 206、另一账号读取旧项目 404、临时项目创建/改名/删除及登出失效；验收账号和空项目已清理，用户项目数量保持 11。公网 HTML 引用 `index-DECdNs8U.js` / `index-Ddul3El6.css`，与本地构建一致。
 
 - `53f2e6d`：本地及 Linux 后端各 192 项测试通过；Linux 测试的 `0984b63` 与合并后的后端、前端源码逐文件一致，合并仅新增 PPT 文件。公网首页与 health 返回 200，无认证或 HTTPS 重定向；`index-BT21k_eh.js`、`index-CiRDzMdb.css` 与本地构建字节一致，新 JS 已无两个小标题。街舞项目历史诊断的 179 段阅读文字中无超过一位小数的秒数，数据库中 3 条原有精确时间建议仍保留，媒体 Range 返回 206。运行时提示词版本为 `vlog-review-v2.1`。
 - 本次切换前及停止 API 后，数据库 queued/running 与 Redis queued/unacked 均为 0；完整 PostgreSQL、媒体与环境配置备份位于 `/opt/xuguangji/backups/subtitle-grounding-20260923-53f2e6d`。worker 确认就绪后启动 API，五项服务 active，环境文件保持不变；旧目录 `copy-cleanup-20260923` 保留，可原子切回。没有迁移数据库结构、重写用户结果或调用收费模型。

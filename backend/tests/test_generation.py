@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from app.api import generation as api
 from app.config import settings
-from app.models import SessionLocal, Project, Asset, AnalysisRun, CompletionPlan, CompletionTask, Evidence, Gap, Job, uid
+from app.models import SessionLocal, User, Project, Asset, AnalysisRun, CompletionPlan, CompletionTask, Evidence, Gap, Job, uid
 from app.providers import video_generation as provider_module
 from app.providers.video_generation import HappyHorseProvider, GenerationError, download_video, validate_download_url
 from app.services.generation import check_capacity
@@ -34,7 +34,8 @@ def context(client, monkeypatch, tmp_path):
     reference_key = "generation-test-frame.jpg"
     (settings.data_dir / reference_key).write_bytes(b"jpeg-test-frame")
     with SessionLocal() as db:
-        p = Project(id=uid(), title="Vlog", intent="Show preparation", style="natural", input_mode="vlog", target_duration_s=60)
+        owner_id = db.scalar(select(User.id).where(User.username == "tester"))
+        p = Project(id=uid(), owner_id=owner_id, title="Vlog", intent="Show preparation", style="natural", input_mode="vlog", target_duration_s=60)
         db.add(p)
         db.flush()
         asset = Asset(id=uid(), project_id=p.id, source_type="real_capture", original_name="source.mp4", storage_key="source.mp4", sha256="source", duration_s=20, width=1280, height=720, has_audio=False, status="ready", meta={"scene_shots": [{"id": "first-shot", "start_s": 0, "end_s": 20, "keyframes": [{"time_s": 2, "key": reference_key}]}], "shots": []})
