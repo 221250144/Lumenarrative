@@ -26,7 +26,7 @@ elements:
     bounds: [56, 330, 420, 90]
     content:
       style: "$body"
-      text: 旭光集从这一刻开始：把成片逐镜头读一遍，指出观众会在哪里看不懂，并给出能在现场执行的补拍与重剪动作。
+      text: 叙光集从这一刻开始：把成片逐镜头读一遍，指出观众会在哪里看不懂，并给出能在现场执行的补拍与重剪动作。
   - elementId: quote
     elementType: text
     bounds: [56, 452, 420, 20]
@@ -165,7 +165,7 @@ elements:
     content:
       style: "$foot"
       wrap: false
-      text: 旭光集 LUMENARRATIVE
+      text: 叙光集 LUMENARRATIVE
   - elementId: foot-r
     elementType: text
     bounds: [504, 508, 400, 12]

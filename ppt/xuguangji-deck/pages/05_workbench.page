@@ -21,8 +21,7 @@ elements:
     elementType: image
     bounds: [56, 148, 560, 324]
     src: media/ui-workbench.png
-    fit: {mode: cover}
-    crop: {top: 0, bottom: 0.22, left: 0, right: 0}
+    fit: {mode: contain}
     border: {style: solid, width: 1, color: "$line"}
   - elementId: a1-tick
     elementType: shape
@@ -116,7 +115,7 @@ elements:
     content:
       style: "$foot"
       wrap: false
-      text: 旭光集 LUMENARRATIVE
+      text: 叙光集 LUMENARRATIVE
   - elementId: foot-r
     elementType: text
     bounds: [504, 508, 400, 12]

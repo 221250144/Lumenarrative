@@ -145,7 +145,7 @@ elements:
     content:
       style: "$foot"
       wrap: false
-      text: 旭光集 LUMENARRATIVE
+      text: 叙光集 LUMENARRATIVE
   - elementId: foot-r
     elementType: text
     bounds: [504, 508, 400, 12]

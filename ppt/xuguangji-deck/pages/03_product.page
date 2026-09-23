@@ -24,7 +24,7 @@ elements:
     bounds: [56, 204, 400, 120]
     content:
       style: "$body"
-      text: 旭光集把成片按转场切分，逐镜头理解画面，再站在全片上下文里审阅，给出最多 5 条定位建议。每条建议只保留最多两段关键证据，说明改哪里、拍什么、什么景别、几秒、拍到什么程度算通过。
+      text: 叙光集把成片按转场切分，逐镜头理解画面，再站在全片上下文里审阅，给出最多 5 条定位建议。每条建议只保留最多两段关键证据，说明改哪里、拍什么、什么景别、几秒、拍到什么程度算通过。
   - elementId: k1-tick
     elementType: shape
     bounds: [56, 344, 14, 3]
@@ -121,8 +121,7 @@ elements:
     elementType: image
     bounds: [500, 92, 404, 372]
     src: media/ui-projects.png
-    fit: {mode: cover}
-    crop: {top: 0, bottom: 0.04, left: 0, right: 0}
+    fit: {mode: contain}
     border: {style: solid, width: 1, color: "$line"}
   - elementId: shot-cap
     elementType: text
@@ -145,7 +144,7 @@ elements:
     content:
       style: "$foot"
       wrap: false
-      text: 旭光集 LUMENARRATIVE
+      text: 叙光集 LUMENARRATIVE
   - elementId: foot-r
     elementType: text
     bounds: [504, 508, 400, 12]

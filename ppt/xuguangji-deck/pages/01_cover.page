@@ -22,40 +22,11 @@ elements:
       style: "$kick"
       wrap: false
       text: INSTA360 THINK BOLD · 参赛作品
-  - elementId: logo-square
-    elementType: shape
+  - elementId: brand-icon
+    elementType: image
     bounds: [56, 116, 60, 60]
-    shapeName: roundRect
-    adjustments: [30000]
-    fill: {type: solid, color: "$gold"}
-  - elementId: logo-sun
-    elementType: shape
-    bounds: [70, 146, 32, 16]
-    shapeName: custom
-    viewBox: [32, 16]
-    path: "M0,16 A16,16 0 0 1 32,16 Z"
-    fill: {type: solid, color: "$bg"}
-  - elementId: logo-ray-c
-    elementType: line
-    bounds: [84, 126, 4, 10]
-    viewBox: [4, 10]
-    points: "2,10 2,0"
-    curve: sharp
-    border: {style: solid, width: 2, color: "$bg"}
-  - elementId: logo-ray-l
-    elementType: line
-    bounds: [70, 132, 10, 10]
-    viewBox: [10, 10]
-    points: "0,0 10,10"
-    curve: sharp
-    border: {style: solid, width: 2, color: "$bg"}
-  - elementId: logo-ray-r
-    elementType: line
-    bounds: [92, 132, 10, 10]
-    viewBox: [10, 10]
-    points: "10,0 0,10"
-    curve: sharp
-    border: {style: solid, width: 2, color: "$bg"}
+    src: media/brand-icon.svg
+    fit: {mode: contain}
   - elementId: wordmark
     elementType: text
     bounds: [132, 122, 300, 36]
@@ -65,7 +36,7 @@ elements:
       fontFamily: {latin: Liter, ea: 阿里妈妈数黑体}
       bold: true
       wrap: false
-      text: 旭光集
+      text: 叙光集
   - elementId: wordmark-en
     elementType: text
     bounds: [134, 158, 300, 12]
@@ -90,7 +61,7 @@ elements:
       color: "$sub"
       fontFamily: {latin: Liter, ea: MiSans}
       wrap: false
-      text: 旭光集 Lumenarrative · Vlog 镜头诊断与补拍助手
+      text: 叙光集 Lumenarrative · Vlog 镜头诊断与补拍助手
   - elementId: desc
     elementType: text
     bounds: [56, 426, 700, 20]

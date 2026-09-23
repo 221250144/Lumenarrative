@@ -289,7 +289,7 @@ elements:
       color: "$mute"
       fontFamily: {latin: Liter, ea: MiSans}
       wrap: false
-      text: 最终剪辑由创作者在自己的剪辑软件中完成 —— 旭光集不碰时间线。
+      text: 最终剪辑由创作者在自己的剪辑软件中完成 —— 叙光集不碰时间线。
   - elementId: foot-line
     elementType: line
     bounds: [56, 500, 848, 1]
@@ -303,7 +303,7 @@ elements:
     content:
       style: "$foot"
       wrap: false
-      text: 旭光集 LUMENARRATIVE
+      text: 叙光集 LUMENARRATIVE
   - elementId: foot-r
     elementType: text
     bounds: [504, 508, 400, 12]

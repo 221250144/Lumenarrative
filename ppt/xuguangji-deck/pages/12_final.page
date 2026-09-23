@@ -10,40 +10,11 @@ elements:
     adjustments: [3000]
     fill: {type: solid, color: "$gold"}
     opacity: 0.3
-  - elementId: logo-square
-    elementType: shape
+  - elementId: brand-icon
+    elementType: image
     bounds: [56, 116, 72, 72]
-    shapeName: roundRect
-    adjustments: [30000]
-    fill: {type: solid, color: "$gold"}
-  - elementId: logo-sun
-    elementType: shape
-    bounds: [73, 152, 38, 19]
-    shapeName: custom
-    viewBox: [38, 19]
-    path: "M0,19 A19,19 0 0 1 38,19 Z"
-    fill: {type: solid, color: "$bg"}
-  - elementId: logo-ray-c
-    elementType: line
-    bounds: [90, 128, 4, 12]
-    viewBox: [4, 12]
-    points: "2,12 2,0"
-    curve: sharp
-    border: {style: solid, width: 2, color: "$bg"}
-  - elementId: logo-ray-l
-    elementType: line
-    bounds: [73, 135, 12, 12]
-    viewBox: [12, 12]
-    points: "0,0 12,12"
-    curve: sharp
-    border: {style: solid, width: 2, color: "$bg"}
-  - elementId: logo-ray-r
-    elementType: line
-    bounds: [99, 135, 12, 12]
-    viewBox: [12, 12]
-    points: "12,0 0,12"
-    curve: sharp
-    border: {style: solid, width: 2, color: "$bg"}
+    src: media/brand-icon.svg
+    fit: {mode: contain}
   - elementId: title
     elementType: text
     bounds: [56, 232, 760, 90]
@@ -60,7 +31,7 @@ elements:
       color: "$sub"
       fontFamily: {latin: Liter, ea: MiSans}
       wrap: false
-      text: 旭光集 LUMENARRATIVE · Vlog 镜头诊断与补拍助手
+      text: 叙光集 LUMENARRATIVE · Vlog 镜头诊断与补拍助手
   - elementId: rule
     elementType: line
     bounds: [56, 392, 848, 1]

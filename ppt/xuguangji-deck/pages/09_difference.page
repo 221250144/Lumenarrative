@@ -48,7 +48,7 @@ elements:
     rows:
       - - text: ""
         - text: 普通 AI 点评
-        - text: 旭光集
+        - text: 叙光集
       - - text: 反馈粒度
         - text: 整体感受：节奏、氛围、完整度
         - text: 定位到镜头与原片秒数
@@ -86,7 +86,7 @@ elements:
     content:
       style: "$foot"
       wrap: false
-      text: 旭光集 LUMENARRATIVE
+      text: 叙光集 LUMENARRATIVE
   - elementId: foot-r
     elementType: text
     bounds: [504, 508, 400, 12]
