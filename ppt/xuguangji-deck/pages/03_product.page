@@ -1,0 +1,156 @@
+pageType: content
+background:
+  type: solid
+  color: "$bg"
+elements:
+  - elementId: kicker
+    elementType: text
+    bounds: [56, 52, 400, 14]
+    content:
+      style: "$kick"
+      wrap: false
+      text: 02 / 产品 PRODUCT
+  - elementId: title
+    elementType: text
+    bounds: [56, 92, 420, 96]
+    content:
+      style: "$h2"
+      fontSize: 26
+      text: |
+        <p>一条已经剪好的 Vlog，</p>
+        <p>换一份能执行的补拍清单。</p>
+  - elementId: body
+    elementType: text
+    bounds: [56, 204, 400, 120]
+    content:
+      style: "$body"
+      text: 旭光集把成片按转场切分，逐镜头理解画面，再站在全片上下文里审阅，给出最多 5 条定位建议。每条建议只保留最多两段关键证据，说明改哪里、拍什么、什么景别、几秒、拍到什么程度算通过。
+  - elementId: k1-tick
+    elementType: shape
+    bounds: [56, 344, 14, 3]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: k1-title
+    elementType: text
+    bounds: [56, 356, 120, 22]
+    content:
+      fontSize: 15
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 镜头级诊断
+  - elementId: k1-body
+    elementType: text
+    bounds: [56, 380, 120, 44]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: |
+        <p>按转场切分</p>
+        <p>原片时间定位</p>
+  - elementId: k-div-1
+    elementType: line
+    bounds: [186, 344, 1, 76]
+    viewBox: [1, 76]
+    points: "0.5,0 0.5,76"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: k2-tick
+    elementType: shape
+    bounds: [210, 344, 14, 3]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: k2-title
+    elementType: text
+    bounds: [210, 356, 120, 22]
+    content:
+      fontSize: 15
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 证据可回看
+  - elementId: k2-body
+    elementType: text
+    bounds: [210, 380, 120, 44]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: |
+        <p>每条建议两段证据</p>
+        <p>点击即播原片片段</p>
+  - elementId: k-div-2
+    elementType: line
+    bounds: [340, 344, 1, 76]
+    viewBox: [1, 76]
+    points: "0.5,0 0.5,76"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: k3-tick
+    elementType: shape
+    bounds: [364, 344, 14, 3]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: k3-title
+    elementType: text
+    bounds: [364, 356, 126, 22]
+    content:
+      fontSize: 15
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 动作可执行
+  - elementId: k3-body
+    elementType: text
+    bounds: [364, 380, 126, 44]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: |
+        <p>景别、秒数、插入位置</p>
+        <p>与验收条件齐备</p>
+  - elementId: shot
+    elementType: image
+    bounds: [500, 92, 404, 372]
+    src: media/ui-projects.png
+    fit: {mode: cover}
+    crop: {top: 0, bottom: 0.04, left: 0, right: 0}
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: shot-cap
+    elementType: text
+    bounds: [500, 470, 404, 14]
+    content:
+      style: "$cap"
+      align: [right, top]
+      wrap: false
+      text: 实拍界面 · 项目工作台
+  - elementId: foot-line
+    elementType: line
+    bounds: [56, 500, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-l
+    elementType: text
+    bounds: [56, 508, 400, 12]
+    content:
+      style: "$foot"
+      wrap: false
+      text: 旭光集 LUMENARRATIVE
+  - elementId: foot-r
+    elementType: text
+    bounds: [504, 508, 400, 12]
+    content:
+      style: "$foot"
+      align: [right, top]
+      wrap: false
+      text: 03 / 12

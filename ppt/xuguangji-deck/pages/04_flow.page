@@ -1,0 +1,314 @@
+pageType: content
+background:
+  type: solid
+  color: "$bg"
+elements:
+  - elementId: kicker
+    elementType: text
+    bounds: [56, 52, 500, 14]
+    content:
+      style: "$kick"
+      wrap: false
+      text: 03 / 工作方式 HOW IT WORKS
+  - elementId: title
+    elementType: text
+    bounds: [56, 88, 760, 40]
+    content:
+      style: "$h2"
+      wrap: false
+      text: 从一条成片到一份清单，七步。
+  - elementId: rail
+    elementType: line
+    bounds: [60, 196, 836, 1]
+    viewBox: [836, 1]
+    points: "0,0.5 836,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: n1-dot
+    elementType: shape
+    bounds: [56, 193, 7, 7]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: n1-num
+    elementType: text
+    bounds: [56, 152, 60, 20]
+    content:
+      fontSize: 13
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: "01"
+  - elementId: n1-title
+    elementType: text
+    bounds: [56, 212, 104, 40]
+    content:
+      fontSize: 13
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 上传主 Vlog
+  - elementId: n1-body
+    elementType: text
+    bounds: [56, 236, 108, 60]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.55
+      text: 一条已经剪好的完整 Vlog
+  - elementId: n2-dot
+    elementType: shape
+    bounds: [178, 193, 7, 7]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: n2-num
+    elementType: text
+    bounds: [178, 152, 60, 20]
+    content:
+      fontSize: 13
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: "02"
+  - elementId: n2-title
+    elementType: text
+    bounds: [178, 212, 104, 40]
+    content:
+      fontSize: 13
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 转场切分
+  - elementId: n2-body
+    elementType: text
+    bounds: [178, 236, 108, 60]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.55
+      text: 硬切与黑场淡入淡出候选
+  - elementId: n3-dot
+    elementType: shape
+    bounds: [300, 193, 7, 7]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: n3-num
+    elementType: text
+    bounds: [300, 152, 60, 20]
+    content:
+      fontSize: 13
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: "03"
+  - elementId: n3-title
+    elementType: text
+    bounds: [300, 212, 104, 40]
+    content:
+      fontSize: 13
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 逐镜头理解
+  - elementId: n3-body
+    elementType: text
+    bounds: [300, 236, 108, 60]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.55
+      text: 视觉模型读取采样帧与源时间
+  - elementId: n4-dot
+    elementType: shape
+    bounds: [422, 193, 7, 7]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: n4-num
+    elementType: text
+    bounds: [422, 152, 60, 20]
+    content:
+      fontSize: 13
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: "04"
+  - elementId: n4-title
+    elementType: text
+    bounds: [422, 212, 104, 40]
+    content:
+      fontSize: 13
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 全片审阅
+  - elementId: n4-body
+    elementType: text
+    bounds: [422, 236, 108, 60]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.55
+      text: 文本模型按原片顺序复审
+  - elementId: n5-dot
+    elementType: shape
+    bounds: [544, 193, 7, 7]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: n5-num
+    elementType: text
+    bounds: [544, 152, 60, 20]
+    content:
+      fontSize: 13
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: "05"
+  - elementId: n5-title
+    elementType: text
+    bounds: [544, 212, 104, 40]
+    content:
+      fontSize: 13
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 定位建议
+  - elementId: n5-body
+    elementType: text
+    bounds: [544, 236, 108, 60]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.55
+      text: 最多 5 条，各带双证据
+  - elementId: n6-dot
+    elementType: shape
+    bounds: [666, 193, 7, 7]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: n6-num
+    elementType: text
+    bounds: [666, 152, 60, 20]
+    content:
+      fontSize: 13
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: "06"
+  - elementId: n6-title
+    elementType: text
+    bounds: [666, 212, 104, 40]
+    content:
+      fontSize: 13
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 人工确认
+  - elementId: n6-body
+    elementType: text
+    bounds: [666, 236, 108, 60]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.55
+      text: 确认或忽略，不被新分析覆盖
+  - elementId: n7-dot
+    elementType: shape
+    bounds: [788, 193, 7, 7]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: n7-num
+    elementType: text
+    bounds: [788, 152, 60, 20]
+    content:
+      fontSize: 13
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: "07"
+  - elementId: n7-title
+    elementType: text
+    bounds: [788, 212, 116, 40]
+    content:
+      fontSize: 13
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 补拍与验收
+  - elementId: n7-body
+    elementType: text
+    bounds: [788, 236, 116, 60]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.55
+      text: 实拍上传或 AI 候选片段
+  - elementId: branch-line
+    elementType: line
+    bounds: [839, 300, 1, 36]
+    viewBox: [1, 36]
+    points: "0.5,0 0.5,36"
+    curve: sharp
+    border: {style: dash, width: 1, color: "$gold"}
+  - elementId: branch-text
+    elementType: text
+    bounds: [676, 342, 228, 44]
+    content:
+      fontSize: 10
+      color: "$goldsoft"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      align: [right, top]
+      text: |
+        <p>AI 补全分支</p>
+        <p>参考首帧 → 3–15 秒候选片段</p>
+  - elementId: note
+    elementType: text
+    bounds: [56, 440, 700, 20]
+    content:
+      fontSize: 11
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      wrap: false
+      text: 最终剪辑由创作者在自己的剪辑软件中完成 —— 旭光集不碰时间线。
+  - elementId: foot-line
+    elementType: line
+    bounds: [56, 500, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-l
+    elementType: text
+    bounds: [56, 508, 400, 12]
+    content:
+      style: "$foot"
+      wrap: false
+      text: 旭光集 LUMENARRATIVE
+  - elementId: foot-r
+    elementType: text
+    bounds: [504, 508, 400, 12]
+    content:
+      style: "$foot"
+      align: [right, top]
+      wrap: false
+      text: 04 / 12

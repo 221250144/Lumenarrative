@@ -1,0 +1,96 @@
+pageType: final
+background:
+  type: solid
+  color: "$bg"
+elements:
+  - elementId: ring
+    elementType: shape
+    bounds: [660, 20, 360, 360]
+    shapeName: donut
+    adjustments: [3000]
+    fill: {type: solid, color: "$gold"}
+    opacity: 0.3
+  - elementId: logo-square
+    elementType: shape
+    bounds: [56, 116, 72, 72]
+    shapeName: roundRect
+    adjustments: [30000]
+    fill: {type: solid, color: "$gold"}
+  - elementId: logo-sun
+    elementType: shape
+    bounds: [73, 152, 38, 19]
+    shapeName: custom
+    viewBox: [38, 19]
+    path: "M0,19 A19,19 0 0 1 38,19 Z"
+    fill: {type: solid, color: "$bg"}
+  - elementId: logo-ray-c
+    elementType: line
+    bounds: [90, 128, 4, 12]
+    viewBox: [4, 12]
+    points: "2,12 2,0"
+    curve: sharp
+    border: {style: solid, width: 2, color: "$bg"}
+  - elementId: logo-ray-l
+    elementType: line
+    bounds: [73, 135, 12, 12]
+    viewBox: [12, 12]
+    points: "0,0 12,12"
+    curve: sharp
+    border: {style: solid, width: 2, color: "$bg"}
+  - elementId: logo-ray-r
+    elementType: line
+    bounds: [99, 135, 12, 12]
+    viewBox: [12, 12]
+    points: "12,0 0,12"
+    curve: sharp
+    border: {style: solid, width: 2, color: "$bg"}
+  - elementId: title
+    elementType: text
+    bounds: [56, 232, 760, 90]
+    content:
+      style: "$h1"
+      fontSize: 40
+      wrap: false
+      text: 以帧补光，以叙成章。
+  - elementId: subtitle
+    elementType: text
+    bounds: [56, 330, 760, 24]
+    content:
+      fontSize: 14
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      wrap: false
+      text: 旭光集 LUMENARRATIVE · Vlog 镜头诊断与补拍助手
+  - elementId: rule
+    elementType: line
+    bounds: [56, 392, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: info-l
+    elementType: text
+    bounds: [56, 410, 400, 16]
+    content:
+      style: "$cap"
+      wrap: false
+      text: INSTA360 THINK BOLD · 参赛作品
+  - elementId: info-r
+    elementType: text
+    bounds: [504, 410, 400, 16]
+    content:
+      style: "$cap"
+      align: [right, top]
+      wrap: false
+      text: 在线入口 · 47.110.79.237
+  - elementId: thinkbold
+    elementType: text
+    bounds: [56, 444, 400, 30]
+    content:
+      fontSize: 20
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      letterSpacing: 6
+      wrap: false
+      text: THINK BOLD.

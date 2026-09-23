@@ -1,0 +1,245 @@
+pageType: content
+background:
+  type: solid
+  color: "$bg"
+elements:
+  - elementId: kicker
+    elementType: text
+    bounds: [56, 52, 500, 14]
+    content:
+      style: "$kick"
+      wrap: false
+      text: 07 / AI 补全 GENERATION
+  - elementId: title
+    elementType: text
+    bounds: [56, 88, 800, 36]
+    content:
+      style: "$h2"
+      wrap: false
+      text: 补拍不到时，让首帧生成候选。
+  - elementId: lead
+    elementType: text
+    bounds: [56, 136, 560, 44]
+    content:
+      style: "$body"
+      text: 在已确认的补拍任务里选定一帧参考首帧，写清画面与秒数，由 HappyHorse i2v 生成候选片段，预览、下载、逐项验收。
+  - elementId: s1-num
+    elementType: text
+    bounds: [56, 214, 80, 16]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: STEP 1
+  - elementId: s1-title
+    elementType: text
+    bounds: [56, 236, 190, 20]
+    content:
+      fontSize: 14
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 参考首帧
+  - elementId: s1-body
+    elementType: text
+    bounds: [56, 260, 190, 48]
+    content:
+      fontSize: 10.5
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: 从原片选一张真实帧，作为生成的起点
+  - elementId: s-arrow-1
+    elementType: line
+    bounds: [248, 244, 22, 1]
+    viewBox: [22, 1]
+    points: "0,0.5 22,0.5"
+    curve: sharp
+    arrow: [null, arrow]
+    border: {style: solid, width: 1, color: "$gold"}
+  - elementId: s2-num
+    elementType: text
+    bounds: [272, 214, 80, 16]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: STEP 2
+  - elementId: s2-title
+    elementType: text
+    bounds: [272, 236, 190, 20]
+    content:
+      fontSize: 14
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 首帧生成
+  - elementId: s2-body
+    elementType: text
+    bounds: [272, 260, 190, 48]
+    content:
+      fontSize: 10.5
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: happyhorse-1.1-i2v 接收图像与描述
+  - elementId: s-arrow-2
+    elementType: line
+    bounds: [464, 244, 22, 1]
+    viewBox: [22, 1]
+    points: "0,0.5 22,0.5"
+    curve: sharp
+    arrow: [null, arrow]
+    border: {style: solid, width: 1, color: "$gold"}
+  - elementId: s3-num
+    elementType: text
+    bounds: [488, 214, 80, 16]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: STEP 3
+  - elementId: s3-title
+    elementType: text
+    bounds: [488, 236, 190, 20]
+    content:
+      fontSize: 14
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 候选片段
+  - elementId: s3-body
+    elementType: text
+    bounds: [488, 260, 190, 48]
+    content:
+      fontSize: 10.5
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: 3–15 秒，可预览、可下载、可重生成
+  - elementId: s-arrow-3
+    elementType: line
+    bounds: [680, 244, 22, 1]
+    viewBox: [22, 1]
+    points: "0,0.5 22,0.5"
+    curve: sharp
+    arrow: [null, arrow]
+    border: {style: solid, width: 1, color: "$gold"}
+  - elementId: s4-num
+    elementType: text
+    bounds: [704, 214, 80, 16]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: STEP 4
+  - elementId: s4-title
+    elementType: text
+    bounds: [704, 236, 200, 20]
+    content:
+      fontSize: 14
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 提交验收
+  - elementId: s4-body
+    elementType: text
+    bounds: [704, 260, 200, 48]
+    content:
+      fontSize: 10.5
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: 按验收条件逐项检查，通过才算补全
+  - elementId: b-label
+    elementType: text
+    bounds: [56, 340, 300, 18]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 三条边界
+  - elementId: b-line-0
+    elementType: line
+    bounds: [56, 364, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: b1
+    elementType: text
+    bounds: [56, 376, 848, 18]
+    content:
+      fontSize: 12
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      wrap: false
+      text: 不自动插入主片 —— 候选片段永远先被人预览和采纳。
+  - elementId: b-line-1
+    elementType: line
+    bounds: [56, 402, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: b2
+    elementType: text
+    bounds: [56, 414, 848, 18]
+    content:
+      fontSize: 12
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      wrap: false
+      text: 不管理成片版本、不导出成片 —— 最终剪辑权留在创作者手里。
+  - elementId: b-line-2
+    elementType: line
+    bounds: [56, 440, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: b3
+    elementType: text
+    bounds: [56, 452, 848, 18]
+    content:
+      fontSize: 12
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      wrap: false
+      text: 不伪造理解 —— 音频或画面未分析到的地方，明确标记不确定。
+  - elementId: foot-line
+    elementType: line
+    bounds: [56, 500, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-l
+    elementType: text
+    bounds: [56, 508, 400, 12]
+    content:
+      style: "$foot"
+      wrap: false
+      text: 旭光集 LUMENARRATIVE
+  - elementId: foot-r
+    elementType: text
+    bounds: [504, 508, 400, 12]
+    content:
+      style: "$foot"
+      align: [right, top]
+      wrap: false
+      text: 08 / 12
