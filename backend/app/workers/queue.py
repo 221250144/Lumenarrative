@@ -16,6 +16,17 @@ celery_app.conf.update(
 )
 
 
+def _fail_submission(db, job, message):
+    if job.type != "verification" or not job.data.get("submission_id"):
+        return
+    submission = db.get(Submission, job.data["submission_id"])
+    if submission:
+        # A processing error is not a verdict that the uploaded shot failed
+        # its acceptance checks. Keep those two states distinct.
+        submission.verification_status = "error"
+        submission.data = {**submission.data, "processing_error": message}
+
+
 def dispatch(job_id):
     try:
         if settings.queue_mode == "celery":
@@ -30,6 +41,7 @@ def dispatch(job_id):
                 "QUEUE_UNAVAILABLE",
                 "后台队列不可用，请启动 Redis 和 worker 后重试",
             )
+            _fail_submission(db, job, job.error_message)
             db.commit()
 
 
@@ -64,6 +76,15 @@ def _execute(job_id, recover_running=False):
         if not claimed.rowcount:
             return
         job = db.get(Job, job_id)
+        if job.type == "verification" and job.data.get("submission_id"):
+            submission = db.get(Submission, job.data["submission_id"])
+            if submission:
+                submission.verification_status = "running"
+                submission.data = {
+                    key: value for key, value in submission.data.items()
+                    if key != "processing_error"
+                }
+                db.commit()
 
     def progress(stage, completed, total):
         with SessionLocal() as db:
@@ -104,10 +125,10 @@ def _execute(job_id, recover_running=False):
             for key, cls, attr in [
                 ("analysis_id", AnalysisRun, "status"),
                 ("edit_id", EditVersion, "render_status"),
-                ("submission_id", Submission, "verification_status"),
             ]:
                 if key in job.data:
                     entity = db.get(cls, job.data[key])
                     if entity:
                         setattr(entity, attr, "failed")
+            _fail_submission(db, row, row.error_message)
             db.commit()

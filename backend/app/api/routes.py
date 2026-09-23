@@ -56,6 +56,7 @@ from app.services.media.views import asset_shots, merge_short_shots, selected_re
 from app.services.concurrency import resource_slot
 from app.services.diagnosis.vlog import select_key_evidence
 from app.services.diagnosis.presentation import ReadableReferences
+from app.services.diagnosis.submission_context import verification_context
 from app.services.media.demo import SCENARIOS, create_demo_asset
 from app.services.planning.engine import plan_tasks
 from app.services.editing.render import make_timeline, validate_timeline
@@ -636,19 +637,14 @@ def submit(id: str, body: SubmissionCreate, db: DB, idempotency_key: Key = None)
     old = repeated(db, f"submit:{id}", idempotency_key, fingerprint)
     if old:
         return old
-    p = get(db, Project, task.project_id)
-    plan = get(db, CompletionPlan, task.plan_id)
-    run = get(db, AnalysisRun, plan.analysis_id)
+    try:
+        p, run, _ = verification_context(db, task)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
     if asset.id in run.asset_snapshot:
         raise HTTPException(409, "请选择本次分析之后补充的新素材")
     if asset.status != "ready":
         raise HTTPException(409, "素材预处理尚未成功完成")
-    if p.intent != run.data["project_config"]["intent"] or p.constraints_json.get(
-        "requirements"
-    ) != run.data["project_config"]["constraints_json"].get("requirements"):
-        raise HTTPException(409, "创作需求已变更，请重新分析并生成任务")
-    if p.input_mode != run.data["project_config"]["input_mode"] or p.constraints_json.get("primary_asset_id") != run.data["project_config"]["constraints_json"].get("primary_asset_id"):
-        raise HTTPException(409, "主片或分析模式已变更，请重新分析并生成任务")
     sub = Submission(
         id=uid(),
         project_id=p.id,
@@ -864,6 +860,13 @@ def retry_job(id: str, db: DB):
             raise HTTPException(409, "视频生成提交结果未确认或上游任务已结束，不能自动再次提交；请先核查百炼控制台")
     job.status, job.error_code, job.error_message = "queued", None, None
     job.retry_count += 1
+    if job.type == "verification":
+        submission = get(db, Submission, job.data["submission_id"])
+        submission.verification_status = "queued"
+        submission.data = {
+            key: value for key, value in submission.data.items() if key != "processing_error"
+        }
+        job.stage, job.completed_units, job.total_units = "等待补拍分析", 0, 0
     db.commit()
     dispatch(job.id)
     return job_json(job)

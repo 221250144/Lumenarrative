@@ -2,18 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { api, post, watchJob } from "../api/client";
 import { createIdempotencyKey } from "../api/idempotency";
 import { preciseTime } from "../lib/evidence";
+import { verificationPresentation } from "../lib/verification";
 import type { Asset, GenerationOptions, Job, Task } from "../types";
 import { Icon } from "./Icon";
 
 const active = (job: Job) => ["queued", "running"].includes(job.status);
-const verificationLabels: Record<string, string> = {
-  queued: "等待分析",
-  running: "正在分析",
-  passed: "符合补拍要求",
-  partial: "部分满足要求",
-  failed: "未满足补拍要求",
-  uncertain: "需要人工复核",
-};
 
 export function TaskGeneration({
   task,
@@ -267,6 +260,9 @@ export function TaskGeneration({
   const submission = resultAsset
     ? task.submissions.find((item) => item.asset_id === resultAsset.id)
     : undefined;
+  const verification = submission
+    ? verificationPresentation(submission)
+    : undefined;
   const locked = busy || submitting || !!pendingIds;
   const validDuration =
     Number.isInteger(duration) && duration >= 3 && duration <= 15;
@@ -500,10 +496,7 @@ export function TaskGeneration({
               </strong>
               <span className="badge">
                 AI 生成 ·{" "}
-                {submission
-                  ? verificationLabels[submission.verification_status] ||
-                    "待分析"
-                  : "待分析"}
+                {verification?.label || "待分析"}
               </span>
             </div>
             {completed.length > 1 && (
@@ -544,16 +537,12 @@ export function TaskGeneration({
                     disabled={
                       busy ||
                       resultAsset.status !== "ready" ||
-                      ["queued", "running"].includes(
-                        submission?.verification_status || "",
-                      )
+                      verification?.pending
                     }
                     onClick={() => onSubmit(task.id, resultAsset.id)}
                   >
                     <Icon name="check" size={14} />
-                    {["queued", "running"].includes(
-                      submission?.verification_status || "",
-                    )
+                    {verification?.pending
                       ? "正在分析…"
                       : submission
                         ? "重新分析片段"

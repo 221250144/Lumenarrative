@@ -34,6 +34,7 @@ from app.services.diagnosis.engine import (
 )
 from app.services.editing.render import render
 from app.services.diagnosis.verification import validate_verification_result
+from app.services.diagnosis.submission_context import verification_context
 
 
 def config_hash():
@@ -521,20 +522,37 @@ def verify_submission(job, progress):
     with SessionLocal() as db:
         submission = db.get(Submission, job.data["submission_id"])
         task = db.get(CompletionTask, submission.task_id)
-        plan = db.get(CompletionPlan, task.plan_id)
-        run = db.get(AnalysisRun, plan.analysis_id)
-        if run.config_hash != config_hash():
-            raise ValueError("模型配置已改变，请重新分析并生成任务后再验证")
+        project, run, req = verification_context(db, task)
         asset = db.get(Asset, submission.asset_id)
+        if not asset or asset.project_id != project.id or submission.project_id != project.id:
+            raise ValueError("新增素材不属于补拍任务项目")
+        if asset.id in run.asset_snapshot:
+            raise ValueError("请选择原分析之后补充的新素材")
         if asset.status != "ready":
             raise ValueError("新增素材还未准备好，请在预处理完成后重试")
+        task_snapshot, requirement_snapshot = deepcopy(task.data), deepcopy(serialize(req))
+        verification_hash = config_hash()
+        submission.data = {
+            **{key: value for key, value in submission.data.items() if key != "processing_error"},
+            "source_analysis_id": run.id,
+            "source_analysis_config_hash": run.config_hash,
+            "verification_config_hash": verification_hash,
+            "verification_provider": settings.model_provider,
+            "verification_vlm": settings.vlm_model,
+            "verification_llm": settings.llm_model,
+            "verification_prompt": PROMPT_VERSION,
+        }
+        db.commit()
         model = provider()
-        evidence, failures, _ = extract_asset(db, asset, run, model, progress)
+        # Keep the original analysis immutable. A new clip is analyzed with
+        # today's model, and its cache must use that model's configuration.
+        evidence, failures, cached = extract_asset(
+            db, asset, SimpleNamespace(config_hash=verification_hash), model, progress
+        )
         previous = rows(db, Evidence, run.id)
         progress("逐项验证验收条件", 0, 1)
-        result = model.verify(task.data, evidence, previous)
-        validate_verification_result(result, task.data, evidence)
-        req = db.get(Requirement, task.data["requirement_id"])
+        result = model.verify(task_snapshot, evidence, previous)
+        validate_verification_result(result, task_snapshot, evidence)
         project_config = SimpleNamespace(**run.data["project_config"])
         new_coverage = {
             "visual_complete": not failures,
@@ -547,9 +565,9 @@ def verify_submission(job, progress):
         }
         rematch = validate_matches(
             model.match(
-                [serialize(req)], previous + evidence, new_coverage, project_config
+                [requirement_snapshot], previous + evidence, new_coverage, project_config
             ),
-            [serialize(req)],
+            [requirement_snapshot],
             previous + evidence,
         )[0]
         statuses = [c["status"] for c in result["checks"]]
@@ -569,12 +587,17 @@ def verify_submission(job, progress):
             if "passed" in statuses
             else "failed"
         )
-        current = db.scalar(
-            select(Project)
-            .where(Project.id == submission.project_id)
-            .execution_options(populate_existing=True)
-        )
-        stale = current.revision != submission.data["project_revision"]
+        # Uploading another supplement increments revision but does not change
+        # the task. Recheck semantic context under the project write lock.
+        db.refresh(task)
+        stale_reason = None
+        try:
+            _, _, current_requirement = verification_context(db, task, lock=True)
+            if task.data != task_snapshot or serialize(current_requirement) != requirement_snapshot:
+                stale_reason = "补拍要求已变更，本次结果仅供历史参考"
+        except ValueError as exc:
+            stale_reason = str(exc)
+        stale = stale_reason is not None
         submission.verification_status = status
         submission.data = {
             **submission.data,
@@ -582,10 +605,15 @@ def verify_submission(job, progress):
             "new_evidence": evidence,
             "rematch": rematch,
             "stale": stale,
+            "stale_reason": stale_reason,
+            "evidence_cached": cached,
         }
         if passed and not stale:
-            for gid in task.data["gap_ids"]:
-                gap = db.get(Gap, gid)
+            for gid in task_snapshot["gap_ids"]:
+                gap = db.get(Gap, gid, populate_existing=True)
+                if (not gap or gap.project_id != project.id or gap.analysis_id != run.id
+                        or gap.data.get("status") in ("resolved", "dismissed")):
+                    continue
                 gap.data = {
                     **gap.data,
                     "status": "resolved",

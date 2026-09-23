@@ -183,6 +183,7 @@ export type Submission = {
   id: string;
   asset_id?: string;
   verification_status: string;
+  processing_error?: string;
   reason?: string;
   checks?: Check[];
   new_evidence?: Evidence[];

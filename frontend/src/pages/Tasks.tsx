@@ -3,20 +3,13 @@ import type { Project, Asset, Plan, Task, Job } from "../types";
 import { Icon } from "../components/Icon";
 import { TaskGeneration } from "../components/TaskGeneration";
 import { keyEvidence, preciseTime } from "../lib/evidence";
+import { verificationPresentation } from "../lib/verification";
 
 const labels: Record<string, string> = {
   reedit: "重剪建议",
   import_existing: "补入已有素材",
   reshoot: "实拍补拍",
   generate: "AI 生成补全",
-};
-const statuses: Record<string, string> = {
-  queued: "等待补拍分析",
-  running: "正在分析补拍",
-  passed: "符合补拍要求",
-  partial: "部分满足",
-  failed: "未满足补拍要求",
-  uncertain: "需要人工复核",
 };
 export function Tasks({
   project,
@@ -222,6 +215,7 @@ function TaskCard({
 }) {
   const [assetId, setAssetId] = useState("");
   const latest = t.submissions[0];
+  const verification = latest ? verificationPresentation(latest) : undefined;
   return (
     <article className={"task-card " + (t.selected ? "recommended" : "")}>
       <div className="task-card-top">
@@ -409,23 +403,22 @@ function TaskCard({
             </div>
           </>
         )}
-        {latest && (
+        {latest && verification && (
           <div
             className={
               "verification-result " +
-              (latest.verification_status === "passed" ? "passed" : "")
+              (verification.passed ? "passed" : "")
             }
           >
             <strong>
               <Icon
-                name={latest.verification_status === "passed" ? "check" : "eye"}
+                name={verification.passed ? "check" : "eye"}
                 size={16}
               />
-              {statuses[latest.verification_status] ||
-                latest.verification_status}
+              {verification.label}
               {latest.stale ? " · 历史结果" : ""}
             </strong>
-            <p>{latest.reason || "正在对照补拍要求分析新素材…"}</p>
+            <p>{verification.detail}</p>
             {latest.checks?.map((c) => (
               <div className="check-result" key={c.check}>
                 <span className={c.status === "passed" ? "ready" : "dim"}>
