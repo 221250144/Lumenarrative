@@ -826,12 +826,10 @@ function GapCard({
         </button>
       )}
       <div className="finding-detail">
-        <span>观察到什么</span>
         <p>{g.reason}</p>
       </div>
       {g.impact && (
         <div className="finding-detail">
-          <span>哪里不清楚</span>
           <p>{g.impact}</p>
         </div>
       )}

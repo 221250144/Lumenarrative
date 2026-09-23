@@ -5,6 +5,7 @@ without rewriting their evidence IDs, snapshots, or original acceptance checks.
 """
 import math
 import re
+from decimal import Decimal, ROUND_HALF_UP
 
 
 TEXT_FIELDS = frozenset({
@@ -23,6 +24,20 @@ PREFIX = r"(?:(?:shot|evidence)[_\s-]?ids?|(?:镜头|证据)\s*(?:id|编号)|id)
 QUOTE = r"[`\"'‘’“”]?"
 OPEN = r"[\[(（]?"
 CLOSE = r"[\])）]?"
+NUMBER = r"\d+(?:\.\d+)?"
+SECONDS_UNIT = r"(?:秒(?:钟)?|(?i:seconds?|s)(?![A-Za-z]))"
+TIME_RANGE = re.compile(
+    rf"(?<![A-Za-z0-9_.:/])(?P<start>{NUMBER})"
+    rf"(?P<join>\s*(?:{SECONDS_UNIT}\s*)?(?:–|—|－|-|~|～|至|到)\s*)"
+    rf"(?P<end>{NUMBER})(?P<unit>\s*{SECONDS_UNIT})"
+)
+TIME_SECONDS = re.compile(
+    rf"(?<![A-Za-z0-9_.:/])(?P<seconds>\d+\.\d{{2,}})(?P<unit>\s*{SECONDS_UNIT})"
+)
+TIME_CLOCK = re.compile(
+    r"(?<![A-Za-z0-9_:/.])(?:\d{1,3}:[0-5]\d:[0-5]\d|\d{1,3}:[0-5]\d)"
+    r"\.\d{2,}(?![\d:.])"
+)
 
 
 def _bounds(item, start_key, end_key):
@@ -33,7 +48,29 @@ def _bounds(item, start_key, end_key):
 
 
 def _seconds(value):
-    return f"{value:.3f}".rstrip("0").rstrip(".")
+    rounded = Decimal(str(value)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    return format(rounded, "f").rstrip("0").rstrip(".")
+
+
+def _clock(match):
+    parts = match.group().split(":")
+    seconds = sum(Decimal(part) * 60 ** index for index, part in enumerate(reversed(parts)))
+    tenths = int((seconds * 10).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    minutes, tail = divmod(tenths, 600)
+    end = f"{tail // 10:02d}.{tail % 10}"
+    if len(parts) == 3:
+        hours, minutes = divmod(minutes, 60)
+        return f"{hours:0{len(parts[0])}d}:{minutes:02d}:{end}"
+    return f"{minutes:0{len(parts[0])}d}:{end}"
+
+
+def readable_times(value):
+    """Round explicit prose timestamps, never arbitrary decimals or source coordinates."""
+    value = TIME_CLOCK.sub(_clock, value)
+    value = TIME_RANGE.sub(
+        lambda m: f"{_seconds(m['start'])}{m['join']}{_seconds(m['end'])}{m['unit']}", value,
+    )
+    return TIME_SECONDS.sub(lambda m: _seconds(m["seconds"]) + m["unit"], value)
 
 
 class ReadableReferences:
@@ -63,7 +100,7 @@ class ReadableReferences:
             lambda match: self.ranges.get(match.group("id").lower(), "对应片段（时间待核实）"), value,
         )
         # Unknown references never borrow a nearby shot's time and imply false precision.
-        return self.unknown_named.sub("对应片段（时间待核实）", value)
+        return readable_times(self.unknown_named.sub("对应片段（时间待核实）", value))
 
     def payload(self, value):
         if isinstance(value, list):

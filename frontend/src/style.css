@@ -3324,15 +3324,11 @@ svg {
 .finding-detail {
   margin-top: 12px;
 }
-.finding-detail > span {
-  font-size: 10px;
-  color: #919191;
-}
 .finding-detail p {
   color: #cccccc;
   font-size: 12px;
   line-height: 1.9;
-  margin-top: 4px;
+  margin-top: 0;
   white-space: pre-line;
 }
 .recommendation-box {

@@ -25,7 +25,7 @@ def test_multiple_shots_and_evidence_keep_their_own_intervals():
         [{"id": SHOT, "start_s": 24.4, "end_s": 25.9}, {"id": SECOND, "start_s": 60.033333, "end_s": 60.066667}],
         [{"id": EVIDENCE, "source_start_s": 24.6, "source_end_s": 25.2}],
     )
-    assert render.text(f"{SHOT} 后接 '{SECOND}'，证据 id: {EVIDENCE}") == "24.4–25.9 秒 后接 60.033–60.067 秒，24.6–25.2 秒"
+    assert render.text(f"{SHOT} 后接 '{SECOND}'，证据 id: {EVIDENCE}") == "24.4–25.9 秒 后接 60–60.1 秒，24.6–25.2 秒"
     assert render.text("镜头 7，从24.4秒到25.9秒；identity保持不变") == "镜头 7，从24.4秒到25.9秒；identity保持不变"
 
 
@@ -46,6 +46,38 @@ def test_projection_keeps_ids_urls_and_original_data_unchanged():
     for key in ("id", "shot_id", "evidence_ids", "issue_key", "url", "anchor"):
         assert result[key] == original[key]
     assert result["recommendation"] == {"instruction": "将 1–2 秒 移到开头", "acceptance_checks": ["1–2 秒 可见"]}
+
+
+@pytest.mark.parametrize(("raw", "expected"), [
+    ("从8.95–16.817 秒中段截取0.833秒", "从9–16.8 秒中段截取0.8秒"),
+    ("第8.951秒到16.817秒，停留1.250秒钟", "第9秒到16.8秒，停留1.3秒钟"),
+    ("8.951s-16.817s / 12.345 seconds", "9s-16.8s / 12.3 seconds"),
+    ("8.951 ～ 16.817 秒，0.123至1.987秒", "9 ～ 16.8 秒，0.1至2秒"),
+    ("00:08.950–00:16.817，01:59.999", "00:09.0–00:16.8，02:00.0"),
+    ("01:59:59.999 到 02:00:02.345", "02:00:00.0 到 02:00:02.3"),
+    ("00:08.9–00:16.8，停留2秒", "00:08.9–00:16.8，停留2秒"),
+    ("焦距8.951–16.817毫米，速度1.234倍，版本v2.123，置信度0.987", "焦距8.951–16.817毫米，速度1.234倍，版本v2.123，置信度0.987"),
+])
+def test_analysis_prose_times_have_at_most_one_decimal_without_changing_other_numbers(raw, expected):
+    render = ReadableReferences()
+    assert render.text(raw) == expected
+    assert render.text(expected) == expected
+
+
+def test_time_display_keeps_original_numeric_coordinates_and_stored_text():
+    raw = {
+        "source_start_s": 8.951, "source_end_s": 16.817,
+        "url": "/media/8.951s.mp4", "confidence": 0.987,
+        "reason": "8.951–16.817 秒画面不连贯",
+        "recommendation": {"instruction": "截取00:08.951–00:09.817", "acceptance_checks": ["持续1.250秒"]},
+    }
+    original = deepcopy(raw)
+    result = ReadableReferences().payload(raw)
+    assert raw == original
+    for key in ("source_start_s", "source_end_s", "url", "confidence"):
+        assert result[key] == original[key]
+    assert result["reason"] == "9–16.8 秒画面不连贯"
+    assert result["recommendation"] == {"instruction": "截取00:09.0–00:09.8", "acceptance_checks": ["持续1.3秒"]}
 
 
 @pytest.fixture
@@ -92,6 +124,22 @@ def test_existing_diagnosis_is_readable_without_regeneration_or_db_mutation(clie
     with SessionLocal() as db:
         assert db.get(Gap, archived["gap_id"]).data["reason"] == f"shot_id '{SHOT}' 显示地铁出口"
         assert db.get(AnalysisRun, archived["analysis_id"]).status == "succeeded"
+
+
+def test_existing_analysis_rounds_prose_without_rounding_playback_ranges(client, archived):
+    with SessionLocal() as db:
+        gap = db.get(Gap, archived["gap_id"])
+        gap.data = {**gap.data, "reason": "8.951–16.817 秒未交代动作", "impact": "00:16.817处衔接突然"}
+        evidence = db.get(Evidence, EVIDENCE)
+        evidence.data = {**evidence.data, "source_start_s": 24.5123, "source_end_s": 25.6789}
+        db.commit()
+    data = client.get(f"/api/v1/analyses/{archived['analysis_id']}/diagnosis").json()
+    assert data["gaps"][0]["reason"] == "9–16.8 秒未交代动作"
+    assert data["gaps"][0]["impact"] == "00:16.8处衔接突然"
+    assert data["evidence"][0]["source_start_s"] == 24.5123
+    assert data["evidence"][0]["source_end_s"] == 25.6789
+    with SessionLocal() as db:
+        assert db.get(Gap, archived["gap_id"]).data["reason"] == "8.951–16.817 秒未交代动作"
 
 
 def test_archived_plan_and_verification_show_times_but_keep_original_acceptance_checks(client, archived):
