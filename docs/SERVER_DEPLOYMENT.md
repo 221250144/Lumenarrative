@@ -5,10 +5,10 @@
 ## 当前状态
 
 - 前端生产构建、FastAPI、PostgreSQL 16、Redis 7、Celery 和 FFmpeg 已部署。Nginx、数据库、Redis、API 和 worker 已启用开机自启。
-- 当前代码来自主分支 `main`，版本为 `4c05a58f8dacf4ecd7f127bce2cfe9f662a9be8d`。产品仅提供 Vlog 分析、重剪/补拍建议、HappyHorse 候选片段生成及补拍视频分析；已移除剪辑、成片版本管理和成片导出。保留 AI 素材下载。金黄主色 `#D8BC3C`，通知移至浮层；桌面素材和视频固定、镜头及建议分别滚动，0.5 秒最短镜头保持。本次清理模式标签、版本脚注、滚动教学及重复小字，分析范围改为折叠详情。
-- 本次界面及功能收敛未修改分析配置或缓存版本。发布前用户的分析任务已自然完成，结果保持可用，不会仅因这次发布要求重新分析。更早模型/切分配置下的旧任务仍遵循原有过期校验。
+- 当前代码来自主分支 `main`，版本为 `53f2e6d520f0d72a0767baaecbab8a632af3eb3f`。本次移除建议卡片的“观察到什么”“哪里不清楚”小标题，保留分析正文；提示词区分叠加字幕、实体上的文字和实际画面；用户可读时间最多一位小数，原始播放定位保持精度。主分支另有的 PPT 更新已合并保留。
+- 提示词版本更新为 `vlog-review-v2.1`，参与分析配置及视觉证据缓存键。旧结果保留、读取时自动缩短时间格式；字幕误判需要用户重新发起分析，不能复用旧视觉证据。此次发布未自动执行收费分析或生成。
 - 视频采样帧理解与新素材视觉验收为 `qwen3.8-max`，全片文字审阅为 `qwen-plus`。此前服务器真实图片请求返回一条通过 schema 校验的证据，用时 39.467 秒；此检查不代表质量或并发性能基准。本次合并未重新执行付费分析、生成或验收。
-- 服务器此前通过公网 HTTP 验证了 Vlog 切分、真实千问诊断和后台队列；本次后端及部署配置与此前通过 Linux 182 项后端测试的 `1900fb7` 完全相同。此前 HappyHorse Provider 使用现有密钥查询云端生成任务，返回 `SUCCEEDED`；本次未额外发起付费分析、生成或验收。
+- 本次后端在本地及服务器 Linux 均通过 192 项测试，前端 TypeScript 检查与 Vite 构建通过。模型语义效果尚未重新实测；提示词修正已发布，不等于所有字幕误判已经消除。
 - 按用户要求使用 `http://47.110.79.237`，不跳转 HTTPS，不要求账号密码。公网页面、健康检查和项目接口均已通过当前电脑的系统代理返回 HTTP 200；Edge 浏览器也已实际打开页面。
 - 当前电脑绕过代理的直连测试仍超时，这与浏览器实际可访问的结果不同，不能据此认定安全组未放行。若某个网络无法访问，应分别检查客户端网络路径和服务器入口。
 - 数据库、Redis、后端与管理预览端口只监听回环地址。模型密钥只在受保护的服务端配置中。
@@ -19,7 +19,7 @@
 |路径或服务|用途|
 |---|---|
 |`/opt/xuguangji/current`|指向当前发布目录的符号链接|
-|`/opt/xuguangji/releases/copy-cleanup-20260923`|当前主分支代码，清理重复小字与提示后的界面|
+|`/opt/xuguangji/releases/subtitle-grounding-20260923-53f2e6d`|当前主分支代码，字幕区分、时间格式及卡片小标题调整|
 |`/opt/xuguangji/venv`|Python 3.12 运行环境|
 |`/opt/xuguangji/certbot`|Certbot 5.8.0 独立环境|
 |`/etc/xuguangji/app.env`|数据库与百炼配置，`root:xuguangji`、`0640`|
@@ -100,6 +100,8 @@ uv pip compile backend/requirements.in --python-version 3.12 \
 
 ## 实际验证
 
+- `53f2e6d`：本地及 Linux 后端各 192 项测试通过；Linux 测试的 `0984b63` 与合并后的后端、前端源码逐文件一致，合并仅新增 PPT 文件。公网首页与 health 返回 200，无认证或 HTTPS 重定向；`index-BT21k_eh.js`、`index-CiRDzMdb.css` 与本地构建字节一致，新 JS 已无两个小标题。街舞项目历史诊断的 179 段阅读文字中无超过一位小数的秒数，数据库中 3 条原有精确时间建议仍保留，媒体 Range 返回 206。运行时提示词版本为 `vlog-review-v2.1`。
+- 本次切换前及停止 API 后，数据库 queued/running 与 Redis queued/unacked 均为 0；完整 PostgreSQL、媒体与环境配置备份位于 `/opt/xuguangji/backups/subtitle-grounding-20260923-53f2e6d`。worker 确认就绪后启动 API，五项服务 active，环境文件保持不变；旧目录 `copy-cleanup-20260923` 保留，可原子切回。没有迁移数据库结构、重写用户结果或调用收费模型。
 - `4c05a58` 为纯前端文案清理发布：TypeScript 检查及 Vite 构建通过，桌面和手机浏览器验证详见 [工作区细节调整](WORKSPACE_REFINEMENTS.md)。公网首页、health、projects 返回 200，项目数为 8；`index-C8LTXRMm.js`、`index-9tp9DRbt.css`、首页及 favicon 与本地构建字节一致。上一版哈希资源继续返回 200，原片和 preview 的 Range 均为 206。HTTP 无认证、不跳转 HTTPS。
 - 本次使用原子目录切换，API/worker/Nginx 的 PID 保持 `2011/2012/1296`，五项关键服务的进程与启动时间均未变化；后端、部署配置逐文件与旧 release 相同，环境文件字节未变。没有执行迁移、数据库/媒体写入或付费请求。旧目录 `/opt/xuguangji/releases/analysis-focus-20260922` 保留用于回退。
 - `1900fb7` 发布包 Linux 后端测试：182 项通过（42.32 秒），本地同样 182 项通过。公网 `index-CNg-vIz0.js`、`index-D29r07hZ.css` 和 favicon 的 SHA256 与本地构建一致，首页及健康检查返回 200；全部五个剪辑/版本/成片导出 GET/POST 入口返回 410，OpenAPI 不再公开剪辑接口。原片及 preview 的 Range 返回 206，生成选项/历史返回 200；生成、素材和补拍分析接口保留。HTTP 免登录、不跳转 HTTPS。
