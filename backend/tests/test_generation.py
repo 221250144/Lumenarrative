@@ -218,6 +218,29 @@ def test_stale_or_ineligible_task_cannot_generate(client, context, change):
     assert post(client, context).status_code == 409
 
 
+def test_zero_duration_reedit_never_opens_generation(client, context):
+    with SessionLocal() as db:
+        task = db.get(CompletionTask, context.task_id)
+        task.data = {
+            **task.data, "type": "reedit",
+            "instruction": "删除重复街景，不新增镜头。",
+            "recommendation": {
+                **task.data["recommendation"], "kind": "reedit", "duration_s": 0,
+            },
+        }
+        db.commit()
+    options = client.get(context.url.removesuffix("generations") + "generation-options").json()
+    assert options["available"] is False
+    assert "重剪" in options["reason"]
+    assert post(client, context).status_code == 409
+    assert post(client, context, key="zero-duration", duration_s=0).status_code == 422
+    with SessionLocal() as db:
+        assert not list(db.scalars(select(Job).where(
+            Job.project_id == context.project_id, Job.type == "generation",
+        )))
+        assert db.get(CompletionTask, context.task_id).data["recommendation"]["duration_s"] == 0
+
+
 def test_completed_generation_is_durable_ai_asset_and_never_resolves_gap(client, context, monkeypatch):
     calls = fake_generation(monkeypatch)
     job_id = post(client, context).json()["job_id"]

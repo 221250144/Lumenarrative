@@ -1,5 +1,5 @@
 from typing import Literal
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, ValidationInfo, field_validator
 
 
 class StrictModel(BaseModel):
@@ -28,9 +28,23 @@ class VlogRecommendation(StrictModel):
     instruction: str = Field(min_length=1, max_length=400)
     shot_scale: str = Field(max_length=60)
     subject_action: str = Field(min_length=1, max_length=200)
-    duration_s: float = Field(gt=0, le=30)
+    duration_s: float = Field(
+        ge=0, le=30, allow_inf_nan=False,
+        description="建议片段时长（秒），最多30秒。reshoot补拍必须大于0；reedit纯删除、调序等无需指定片段时长时填0，不虚构时长。",
+    )
     insert_position: Literal["before", "after", "replace"]
     acceptance_checks: list[str] = Field(min_length=1, max_length=3)
+
+    @field_validator("duration_s")
+    @classmethod
+    def validate_duration_for_kind(cls, value: float, info: ValidationInfo) -> float:
+        if info.data.get("kind") == "reshoot" and value <= 0:
+            raise ValueError(
+                "reshoot补拍的duration_s必须大于0且不超过30秒；"
+                "仅reedit纯删除或调序等无需指定片段时长的建议可为0。"
+                "请依据建议本身修复，不要任意填入默认时长。"
+            )
+        return value
 
 
 class VlogFinding(StrictModel):

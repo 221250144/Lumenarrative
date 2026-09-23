@@ -1,6 +1,8 @@
 import hashlib
 import json
+import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from copy import deepcopy
 from types import MappingProxyType, SimpleNamespace
 from sqlalchemy import select, delete
 from app.config import settings
@@ -138,6 +140,73 @@ def process_asset(job, progress):
             raise
 
 
+def _partial_cached_windows(cached, shots, asset):
+    """Recover complete successful windows, or refuse ambiguous legacy caches."""
+    try:
+        def window_key(window):
+            start, end = window
+            if not all(math.isfinite(value) for value in (start, end)) or not 0 <= start < end:
+                raise ValueError("invalid cache window")
+            return start, end
+
+        lookup = {window_key((shot["start_s"], shot["end_s"])): index for index, shot in enumerate(shots)}
+        if len(lookup) != len(shots):
+            return None
+        failures = cached["failed_ranges"]
+        if not isinstance(failures, list) or not failures or not isinstance(cached["evidence"], list):
+            return None
+        failed_indices = set()
+        for failure in failures:
+            if failure["asset_id"] != asset.id:
+                return None
+            failed_indices.add(lookup[window_key((failure["start_s"], failure["end_s"]))])
+        if len(failed_indices) != len(failures):
+            return None
+
+        results, covered = [None] * len(shots), set()
+        recovered = []
+        for evidence in cached["evidence"]:
+            # Transcripts can change independently of visual extraction. Rebuild
+            # them below rather than duplicating/staling the previous audio rows.
+            if evidence.get("evidence_type") == "audio":
+                continue
+            if (evidence.get("evidence_type", "visual") not in ("visual", "text")
+                    or evidence["asset_id"] != asset.id or not isinstance(evidence["action"], str)):
+                return None
+            windows = evidence["provenance"]["windows"]
+            if not isinstance(windows, list) or not windows:
+                return None
+            indices = {lookup[window_key(window)] for window in windows}
+            if indices & failed_indices or any(evidence.get("shot_id") != shots[index].get("shot_id") for index in indices):
+                return None
+            ordered = sorted((shots[index]["start_s"], shots[index]["end_s"]) for index in indices)
+            stop = ordered[0][1]
+            for start, end in ordered[1:]:
+                if start > stop:
+                    return None
+                stop = max(stop, end)
+            # A merged row may span several successful windows of one shot.
+            # Validate the retained range, and keep that row only once.
+            span = {
+                "start_s": min(shots[index]["start_s"] for index in indices),
+                "end_s": max(shots[index]["end_s"] for index in indices),
+            }
+            item = validate_evidence(deepcopy(evidence), asset.id, asset.duration_s, span)
+            recovered.append((min(indices), item))
+            covered.update(indices)
+        if covered != set(range(len(shots))) - failed_indices:
+            # Without per-window raw results, no evidence is ambiguous: it may
+            # mean a valid empty result or an incomplete/old cache. Recompute.
+            return None
+        for index in covered:
+            results[index] = []
+        for index, item in recovered:
+            results[index].append(item)
+        return results
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError):
+        return None
+
+
 def extract_asset(db, asset, run, model, progress):
     cache_key = hashlib.sha256(
         (asset.project_id + asset.id + asset.sha256 + run.config_hash
@@ -193,13 +262,18 @@ def extract_asset(db, asset, run, model, progress):
         # No item escapes until every observation in this window is valid.
         return window_items
 
-    window_results, window_failures = [None] * len(shots), [None] * len(shots)
-    progress("提取素材证据", 0, len(shots))
-    if shots:
+    window_results = _partial_cached_windows(cached, shots, snapshot) if cached.get("key") == cache_key else None
+    if window_results is None:
+        window_results = [None] * len(shots)
+    window_failures = [None] * len(shots)
+    pending = [index for index, result in enumerate(window_results) if result is None]
+    reused = len(shots) - len(pending)
+    progress("提取素材证据", reused, len(shots))
+    if pending:
         with ThreadPoolExecutor(
             max_workers=settings.model_concurrency, thread_name_prefix="vlog-analysis"
         ) as pool:
-            futures = {pool.submit(extract_window, shot): i for i, shot in enumerate(shots)}
+            futures = {pool.submit(extract_window, shots[index]): index for index in pending}
             for completed, future in enumerate(as_completed(futures), 1):
                 index = futures[future]
                 shot = shots[index]
@@ -213,7 +287,7 @@ def extract_asset(db, asset, run, model, progress):
                         "reason": str(exc)[:400],
                     }
                 # Job progress and all database access remain on the caller.
-                progress("提取素材证据", completed, len(shots))
+                progress("提取素材证据", reused + completed, len(shots))
     items = [item for result in window_results if result is not None for item in result]
     failed = [failure for failure in window_failures if failure is not None]
     transcripts = db.scalars(

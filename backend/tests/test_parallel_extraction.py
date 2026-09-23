@@ -208,9 +208,9 @@ def test_failed_windows_are_atomic_ordered_and_never_reused_as_complete_cache(mo
     state["fail"] = False
     recovered, failures, cached = extract(asset, provider)
     assert not cached and not failures and len(recovered) == 4
-    assert state["calls"] == 8
+    assert state["calls"] == 6
     _, failures, cached = extract(asset, provider)
-    assert cached and not failures and state["calls"] == 8
+    assert cached and not failures and state["calls"] == 6
 
 
 def test_complete_cache_skips_workers_and_gives_new_analysis_ids(monkeypatch):
