@@ -207,7 +207,14 @@ class _VlogReferences:
             restored_finding["anchor_shot_id"] = self.shot_ids[anchor]
             restored_finding["related_shot_id"] = self.shot_ids[related] if related is not None else None
             restored_finding["evidence_ids"] = [self.evidence_ids[alias] for alias in finding["evidence_ids"]]
-        return restored
+        # The model may echo valid internal labels in prose despite the prompt.
+        # Resolve those exact labels to source times without changing machine IDs.
+        from app.services.diagnosis.presentation import ReadableReferences
+
+        return ReadableReferences(
+            [*self.source_shots.values(), *self.shots],
+            [*self.source_evidence.values(), *self.evidence],
+        ).payload(restored)
 
 
 class VLMProvider(Protocol):

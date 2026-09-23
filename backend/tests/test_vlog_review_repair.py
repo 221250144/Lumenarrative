@@ -190,6 +190,49 @@ def test_uuid_context_uses_only_short_refs_then_restores_exact_ids_without_mutat
     assert context == before
 
 
+def test_readable_aliases_become_source_times_without_changing_machine_ids_or_context(
+    monkeypatch, review_context,
+):
+    context = deepcopy(review_context)
+    context["shots"][0].update(start_s=0.123456, end_s=1.987654)
+    context["shots"][1].update(start_s=2.123456, end_s=3.987654)
+    context["evidence"][0].update(source_start_s=0.456789, source_end_s=1.789123)
+    context["evidence"][1].update(source_start_s=2.234567, source_end_s=3.765432)
+    shot_ids = {item["id"]: str(uuid4()) for item in context["shots"]}
+    evidence_ids = {item["id"]: str(uuid4()) for item in context["evidence"]}
+    for shot in context["shots"]:
+        shot["id"] = shot_ids[shot["id"]]
+        shot["evidence_ids"] = [evidence_ids[value] for value in shot["evidence_ids"]]
+    for item in context["evidence"]:
+        item["id"] = evidence_ids[item["id"]]
+        item["shot_id"] = shot_ids[item["shot_id"]]
+    model_review = deepcopy(context["model_good"])
+    model_review["summary"] = "shot_1 后接 shot_2；F1.85 镜头，1080P。"
+    finding = model_review["findings"][0]
+    finding["observation"] = "evidence_1 显示市场，evidence_2 显示餐桌；价格19.99元。"
+    finding["recommendation"]["instruction"] = "将 shot_2 前移至 shot_1 后，保留0.875秒；比例1.85。"
+    finding["recommendation"]["acceptance_checks"] = [
+        "evidence_1 与 evidence_2 地点关系清楚", "shot_id: shot_99 需核实",
+    ]
+    before_context, before_model = deepcopy(context), deepcopy(model_review)
+    calls = stub_outputs(monkeypatch, [model_review])
+    review = call_review(context)
+    assert len(calls) == 1
+    assert review["summary"] == "0.1–2 秒 后接 2.1–4 秒；F1.85 镜头，1080P。"
+    restored = review["findings"][0]
+    assert restored["observation"] == "0.5–1.8 秒 显示市场，2.2–3.8 秒 显示餐桌；价格19.99元。"
+    assert restored["recommendation"]["instruction"] == "将 2.1–4 秒 前移至 0.1–2 秒 后，保留0.9秒；比例1.85。"
+    assert restored["recommendation"]["acceptance_checks"] == [
+        "0.5–1.8 秒 与 2.2–3.8 秒 地点关系清楚", "对应片段（时间待核实） 需核实",
+    ]
+    assert restored["anchor_shot_id"] == shot_ids["shot-0"]
+    assert restored["related_shot_id"] == shot_ids["shot-1"]
+    assert restored["evidence_ids"] == [evidence_ids["evidence-0"], evidence_ids["evidence-1"]]
+    assert review["chapters"][0]["shot_ids"] == list(shot_ids.values())
+    assert restored["recommendation"]["duration_s"] == before_model["findings"][0]["recommendation"]["duration_s"]
+    assert context == before_context and model_review == before_model
+
+
 @pytest.mark.parametrize("bad_reference", ["evidence_02", "EVIDENCE_2", "evidence-2", "evidence_2 ", "SENSITIVE_PRIVATE_UUID"])
 def test_unknown_alias_is_not_guessed_and_repair_has_exact_safe_field_hint(monkeypatch, review_context, caplog, bad_reference):
     bad = deepcopy(review_context["model_good"])
