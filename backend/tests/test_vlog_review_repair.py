@@ -9,6 +9,7 @@ import pytest
 
 from app.providers.models import CompatibleProvider
 from app.schemas import VlogReviewOutput
+from app.services.diagnosis.vlog import build_vlog_diagnosis
 
 
 @pytest.fixture
@@ -216,13 +217,85 @@ def test_chapter_aliases_are_validated_even_when_no_findings(monkeypatch, review
     assert diagnostic["path"] == "chapters.0.shot_ids.1" and diagnostic["code"] == "unknown_shot"
 
 
-def test_extra_same_shot_citation_is_repaired_not_silently_removed(monkeypatch, review_context):
+@pytest.mark.parametrize("multiple_types", [False, True])
+def test_valid_multiple_citations_pass_once_then_display_only_key_evidence(
+    monkeypatch, review_context, multiple_types,
+):
+    model_review = deepcopy(review_context["model_good"])
+    if multiple_types:
+        text_evidence = {
+            **review_context["evidence"][0], "id": "evidence-0-text",
+            "evidence_type": "text", "action": "画面字幕写明市场名称",
+        }
+        review_context["evidence"].append(text_evidence)
+        review_context["shots"][0]["evidence_ids"].append(text_evidence["id"])
+        # Aliases follow shot/time order; both visual and text evidence for the
+        # anchor precede the second shot's visual evidence.
+        aliases = ["evidence_1", "evidence_2", "evidence_3", "evidence_1"]
+        expected = ["evidence-0", "evidence-0-text", "evidence-1", "evidence-0"]
+    else:
+        aliases = ["evidence_1", "evidence_2", "evidence_1"]
+        expected = ["evidence-0", "evidence-1", "evidence-0"]
+    model_review["findings"][0]["evidence_ids"] = aliases
+    VlogReviewOutput.model_validate(model_review)
+    before = deepcopy(model_review)
+    calls = stub_outputs(monkeypatch, [model_review])
+    review = call_review(review_context)
+    assert len(calls) == 1
+    assert review["findings"][0]["evidence_ids"] == expected
+    assert model_review == before
+    diagnosis = build_vlog_diagnosis(
+        review, review_context["shots"], review_context["evidence"], review_context["coverage"],
+    )
+    assert diagnosis["gaps"][0]["evidence_ids"] == ["evidence-0", "evidence-1"]
+    assert len(diagnosis["gaps"][0]["evidence_ids"]) <= 2
+    # Display selection must not destructively trim the valid model review.
+    assert review["findings"][0]["evidence_ids"] == expected
+
+
+def test_same_anchor_related_reference_normalizes_to_none_without_new_reference(
+    monkeypatch, review_context,
+):
+    model_review = deepcopy(review_context["model_good"])
+    model_review["findings"][0].update({
+        "related_shot_id": "shot_1", "evidence_ids": ["evidence_1", "evidence_1"],
+    })
+    before = deepcopy(model_review)
+    calls = stub_outputs(monkeypatch, [model_review])
+    review = call_review(review_context)
+    assert len(calls) == 1
+    finding = review["findings"][0]
+    assert finding["anchor_shot_id"] == "shot-0"
+    assert finding["related_shot_id"] is None
+    assert finding["evidence_ids"] == ["evidence-0", "evidence-0"]
+    assert model_review == before
+    diagnosis = build_vlog_diagnosis(
+        review, review_context["shots"], review_context["evidence"], review_context["coverage"],
+    )
+    assert diagnosis["gaps"][0]["anchor"]["related_shot_id"] is None
+    assert diagnosis["gaps"][0]["evidence_ids"] == ["evidence-0"]
+
+
+@pytest.mark.parametrize("invalid_alias,error_code", [
+    ("unknown-evidence", "unknown_evidence"),
+    ("evidence_3", "unrelated_evidence"),
+])
+def test_invalid_citations_after_display_limit_are_still_all_validated(
+    monkeypatch, review_context, invalid_alias, error_code,
+):
     bad = deepcopy(review_context["model_good"])
-    bad["findings"][0]["evidence_ids"].append("evidence_1")
-    calls = stub_outputs(monkeypatch, [bad, review_context["model_good"]])
-    assert call_review(review_context) == review_context["good"]
-    assert json.loads(calls[1]["payload"]["validation_error"])["path"] == "findings.0.evidence_ids.2"
-    assert calls[1]["payload"]["previous_review"]["findings"][0]["evidence_ids"] == ["evidence_1", "evidence_2", "evidence_1"]
+    cited = ["evidence_1", "evidence_2", "evidence_1", invalid_alias]
+    bad["findings"][0]["evidence_ids"] = cited
+    VlogReviewOutput.model_validate(bad)
+    calls = stub_outputs(monkeypatch, [bad, bad])
+    with pytest.raises(ValueError, match="连续两次未能正确关联镜头与证据"):
+        call_review(review_context)
+    assert len(calls) == 2
+    diagnostic = json.loads(calls[1]["payload"]["validation_error"])
+    assert diagnostic["path"] == "findings.0.evidence_ids.3"
+    assert diagnostic["code"] == error_code
+    assert calls[1]["payload"]["previous_review"]["findings"][0]["evidence_ids"] == cited
+    assert bad["findings"][0]["evidence_ids"] == cited
 
 
 @pytest.mark.parametrize("invalid", ["range", "asset", "index"])

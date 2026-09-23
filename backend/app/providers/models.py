@@ -169,7 +169,7 @@ class _VlogReferences:
                 alias: self.shots_by_alias[alias]["evidence_ids"][:32]
                 for alias in involved if alias in self.shots_by_alias
             }
-        if finding is None or code in ("unknown_shot", "same_shot"):
+        if finding is None or code == "unknown_shot":
             detail["allowed_shot_ids"] = list(self.shot_ids)[:64]
         detail["instruction"] = "仅从原始 shots/evidence 复制完全一致的短引用；每个观点最多两个镜头各一条证据，不猜测或拼接编号。"
         raise _VlogReferenceError(detail)
@@ -188,8 +188,9 @@ class _VlogReferences:
                 if (alias is not None or key == "anchor_shot_id") and alias not in self.shot_ids:
                     self.fail(f"{prefix}.{key}", "unknown_shot", "诊断引用了不存在的镜头锚点", finding)
             if related == anchor:
-                self.fail(f"{prefix}.related_shot_id", "same_shot", "相关镜头必须与锚点镜头不同", finding)
-            seen_shots = set()
+                # Repeating the same known shot adds no second relationship.
+                # Normalize redundant metadata, never infer a different shot.
+                related = None
             for position, alias in enumerate(finding["evidence_ids"]):
                 path = f"{prefix}.evidence_ids.{position}"
                 item = self.evidence_by_alias.get(alias)
@@ -199,9 +200,9 @@ class _VlogReferences:
                     self.fail(path, "unrelated_evidence", "诊断证据不属于锚点或相关镜头", finding)
                 if alias not in self.shots_by_alias[item["shot_id"]]["evidence_ids"]:
                     self.fail(path, "inconsistent_evidence", "诊断证据与镜头索引不一致", finding)
-                if item["shot_id"] in seen_shots or position >= 2:
-                    self.fail(path, "too_many_evidence", "每条观点最多两个镜头各一条证据", finding)
-                seen_shots.add(item["shot_id"])
+                # Validate every citation, including those beyond the UI limit.
+                # Diagnosis selects key evidence only after all refs pass;
+                # multiple valid observations from one shot are not an error.
             restored_finding = restored["findings"][index]
             restored_finding["anchor_shot_id"] = self.shot_ids[anchor]
             restored_finding["related_shot_id"] = self.shot_ids[related] if related is not None else None
@@ -348,6 +349,7 @@ class CompatibleProvider:
             "missing_information 要写待补充或理顺的具体信息；observation 只写已观察到的事实；impact 解释理解障碍；title 简短而具体。不要用存在正常剪辑切点作为缺口证据。"
             "优先评估能否用片内已经存在的镜头进行删减/挪动解决，能解决则 recommendation.kind=reedit，并明确现有片段和操作；否则 reshoot，写清拍谁做什么、景别、建议3–8秒和在锚点前/后插入。不得编造用户拥有的未上传素材。"
             "recommendation.duration_s 必须是有限数且不超过30秒。reedit 的0秒仅用于无需指定新增或保留片段时长的纯删除、纯调序；需要截取或保留片段时填写有画面依据的正时长。reshoot 必须大于0秒，按实际建议填写3–8秒。不得为了通过校验随意编造或填充时长。"
+            "insert_position只可填写before、after、replace；删除锚点镜头时用replace定位要修改的原片位置，并在instruction中明确写删除，不填写none、delete等其他值。只涉及一个镜头时related_shot_id=null，不重复填写锚点。"
             "recommendation 必须为可直接执行的一种方案，acceptance_checks 为1–3个肉眼可核实的具体结果。只返回 should 或 optional，不得自动代用户确认。"
             "所有给用户阅读的描述、观察、建议与验收条件必须用原片时间段（如24.4–25.9秒）指代镜头，不写shot_id、evidence_id、UUID或内部编号；时间取自shots的start_s/end_s，文字中最多保留小数点后一位。"
             "结构化anchor_shot_id、related_shot_id、chapters.shot_ids仅使用shots中给定的shot_1等短引用；evidence_ids仅使用对应镜头evidence_ids中给定的evidence_1等短引用。完全照抄，不改写、补零、拼接编号或使用UUID，系统会严格映射回实际素材。"
