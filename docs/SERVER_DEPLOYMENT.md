@@ -2,6 +2,8 @@
 
 最近部署日期：2026-09-23。服务器：`47.110.79.237`，Ubuntu 24.04、8 vCPU、28 GiB 内存。
 
+本文用于维护团队已有部署，并保留历次验证记录。源码提交与全新本地启动不依赖该服务器，也不需要 SSH 密钥或线上账号；请使用 [README](../README.md) 和 [源码交付说明](SUBMISSION.md)。本次交付文档更新没有执行服务器发布。下文历史条目中的“免登录”、旧模型及剪辑/导出验证只描述相应版本，不代表当前产品功能。
+
 ## 当前状态
 
 - 2026-09-23 补拍验证修复：旧分析的提示词版本与当前版本不同，曾被整体配置哈希校验误判为任务过期。补拍验证现在保留原分析与证据来源，按当前模型配置独立提取新素材并分区缓存；原视频、创作要求与最新成功分析保持一致时可继续使用原任务。需求或主片确实变更时继续拦截；验证期间再次上传补拍不会仅因 revision 增加被判过期。演示/真实模式继续隔离，晚到结果不覆盖已忽略或已解决的问题。
@@ -66,7 +68,7 @@ Nginx 使用 `deploy/nginx-http.conf.template` 和 `deploy/nginx-app.conf`，监
 bash /opt/xuguangji/current/deploy/enable-https.sh 47.110.79.237
 ```
 
-脚本先做 Let's Encrypt 测试环境验证，再申请受信任证书；通过 Nginx 配置检查后启用 HTTPS，安装每 12 小时检查一次的续期 timer，并执行一次续期演练。执行后 HTTP 会跳转到 HTTPS，访问方式仍为免登录。当前用户要求使用 HTTP，因此未执行此流程。
+脚本先做 Let's Encrypt 测试环境验证，再申请受信任证书；通过 Nginx 配置检查后启用 HTTPS，安装每 12 小时检查一次的续期 timer，并执行一次续期演练。执行后 HTTP 会跳转到 HTTPS，应用账号登录仍然有效；使用 HTTPS 时应将 `AUTH_COOKIE_SECURE=true` 并重新加载应用配置。当前团队选择 HTTP，因此未执行此流程。
 
 IP 证书需使用 `shortlived` profile，Certbot webroot 方式要求 5.4 及以上版本，参见 [Let's Encrypt 官方说明](https://letsencrypt.org/2026/03/11/shorter-certs-certbot/)。切勿将只有证书申请脚本准备好当作 HTTPS 已验收。
 

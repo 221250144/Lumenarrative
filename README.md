@@ -1,167 +1,170 @@
 # 叙光集 · Lumenarrative
 
-以帧补光，以叙成章。
+**以帧补光，以叙成章。**
 
-Insta360 Think Bold 参赛项目。
+NJU人型token队 · 赛道一：AI + 影像产品开发
 
-面向 Vlog 创作者的 Web 应用：上传一条已经剪辑好的 Vlog，先按转场切分内部镜头，再结合全片给出最多 5 条具体补拍或重剪建议。每条建议只保留 1–2 段关键证据，说明修改位置、主体动作、景别、秒数与验收条件。
+叙光集是面向 Vlog 创作者的镜头诊断与补拍助手。输入是一条**已经剪好的 Vlog**，可以包含实拍或 AI 生成的画面。系统检测转场、拆分镜头，结合全片内容给出最多 5 条具体的补拍或重剪建议，并将建议绑定到原片时间段与关键证据。
 
-产品只提供分析和补全建议、AI 候选片段生成，以及用户上传补拍视频后的分析。不提供站内剪辑、成片版本管理或成片导出；用户下载所需的 AI 片段后，在其他剪辑软件中完成修改。重剪建议可复制。
+确认建议后，用户可以上传补拍片段进行复核，也可以生成、预览并下载 AI 候选片段。**重剪仅提出建议；应用不提供时间线剪辑、成片版本管理或最终成片导出。** 最终修改由用户在其他剪辑软件中完成。
 
-主分支已集成自动生成补全片段：确认补拍建议后，在“补拍与重剪”任务卡选择参考首帧，使用 `happyhorse-1.1-i2v` 生成候选视频，再预览、下载并提交验收。需要在服务端启用 `VIDEO_GENERATION_ENABLED=true`，详见 [HappyHorse 视频生成](docs/HAPPYHORSE_EXPERIMENT.md)。
+首次运行或使用参赛源码包，请先阅读 [提交与运行说明](docs/SUBMISSION.md)。代码仓库与内部服务名沿用 `xuguangji`，中文产品名为“叙光集”；将目录命名为 `赛道一_NJU人型token队_叙光集` 不影响运行。
 
-最新设计见 [Vlog 系统架构 v2](docs/VLOG_ARCHITECTURE.md)，本次按最新需求收窄旧任务书的通用素材流程；产品名为“叙光集”。提案和成员联系方式留在上级目录，不属于代码项目，不应随仓库公开。
+## 功能与边界
 
-## 当前可用状态
-
-|模块|状态|
+|模块|当前实现|
 |---|---|
-|React 三页工作台|项目创建/列表、Vlog 审看、补拍与重剪建议|
-|账号与项目管理|注册、登录、退出、修改密码；按用户隔离项目、素材和任务；项目重命名、确认删除|
-|真实视频处理|FFprobe 校验、预览转码、硬切与黑场转场候选、非重叠镜头、镜头内部最多 4 帧/窗口、音轨提取|
-|结构化分析|主 Vlog 概括、章节、镜头摘要、最多 5 条定位建议与双证据；人工确认/忽略、revision 快照|
-|计划与验证|每条建议对应具体补拍/重剪任务、最多两张参考帧、逐项验收；旧任务保留兼容|
-|AI 视频补全|HappyHorse 首帧生成、3–15 秒候选片段、历史记录、下载及验收；不自动修改原片|
-|任务与消息|后台进度及历史报错收进浮层；当前操作错误可关闭，不在页面顶部占位|
-|后台任务|真实阶段与数量、SSE、断线轮询、失败重试、本地重启后显式标记中断|
-|千问|已接入百炼专属业务空间；`qwen-plus` 文本分析与 `qwen3.8-max` 图片理解已通过真实调用和结构校验|
-|ASR|可配置兼容 multipart `/audio/transcriptions` 的服务；未配置/失败明确显示，不编造对白；尚未验证真实服务|
-|影石 SDK|`unavailable`，只提供适配接口。普通影石导出视频属于文件导入|
-|PostgreSQL / Redis / Celery|已在 Ubuntu 服务器通过 systemd 部署并验证真实任务；Docker Compose 路径尚未实际启动验收|
+|账号与项目管理|注册、登录、退出、修改密码；按用户隔离项目及其素材、分析、任务和生成记录；支持项目搜索、重命名与确认删除|
+|视频预处理|FFprobe 校验、预览转码、转场候选检测、短于 0.5 秒的镜头与相邻镜头合并、关键帧抽取、音轨提取|
+|Vlog 审看|主片概括、章节、镜头摘要、最多 5 条建议；每条最多 2 段关键证据；按原片时间回看、人工确认或忽略|
+|补拍与重剪建议|给出建议动作、景别、时长、位置和验收条件；重剪建议可复制，供外部剪辑软件使用|
+|AI 候选片段|`happyhorse-1.1-i2v` 首帧图生视频；已合并至 `main`，支持生成记录、预览、下载和提交复核|
+|补充片段复核|用户上传实拍或 AI 生成片段，按原补拍任务逐项分析，保留通过、部分满足、不确定或未满足等结果|
+|后台任务|阶段进度、SSE 与断线轮询、失败信息及重试；任务与消息集中在浮层中|
 
-配置模板默认 **演示数据模式**；本机 `.env` 已配置为千问真实模式。演示素材为本地程序生成的几何分镜卡，故事标签来自固定夹具，不能当成模型识别结果或准确率证据。上传、转码和原片定位仍是真实执行。普通用户视频在演示模式只返回“未进行视觉理解”，不会假装已经识别内容。切换真实模式后，不会在调用失败时退回演示数据。
+“生成成功”不等于“符合补拍要求”，复核通过也不会自动将片段剪入原片。内部分析快照用于结果追溯，不是成片版本管理功能。
 
-## 本地启动
+项目删除为软删除：项目入口立即不可访问，底层记录及媒体保留，不保证释放磁盘。有排队或执行中的任务时需等待结束再删除。账号隔离与迁移说明见 [账号与项目管理](docs/ACCOUNTS.md)。
 
-依赖：macOS/Linux、Python 3.12（由 uv 管理）、Node.js 22.12+ 或 24、FFmpeg 和 ffprobe。此实现已在本机 Python 3.12、Node 24、FFmpeg 9 验证。
+## 本地快速开始
+
+需要安装 **uv、Python 3.12、Node.js 22.12+（推荐使用 Node.js 24 运行附带测试）、npm、FFmpeg 和 ffprobe**。Python 可由 uv 创建环境时安装。源码包不包含 `.venv`、`node_modules` 等依赖目录，首次安装需要联网下载依赖。
+
+### macOS
+
+在仓库根目录执行：
 
 ```bash
-# 从 xuguangji 目录执行
 bash scripts/setup.sh
 bash scripts/dev.sh
 ```
 
-打开 <http://127.0.0.1:5173>；API 文档 <http://127.0.0.1:8000/docs>。
+`setup.sh` 创建 `.venv`、安装锁定依赖、在 `.env` 不存在时复制模板、执行数据库迁移并安装前端依赖；不会覆盖已有 `.env`。FFmpeg 未安装时可使用 `brew install ffmpeg`。
 
-`setup.sh` 创建虚拟环境、安装锁定依赖、在不存在时复制 `.env.example` 为 `.env`，执行 Alembic 迁移并安装前端依赖。不会替换已有 `.env`。`dev.sh` 同时启动前后端，Ctrl+C 结束。仅绑定回环地址；首次使用先注册账号。已有项目的归属迁移见 [账号与项目管理](docs/ACCOUNTS.md)。
+### Linux
 
-也可分别启动：
+使用 Linux 专用依赖锁文件；先安装系统的 FFmpeg、uv 和 Node.js，再在仓库根目录执行：
 
 ```bash
+uv venv --python 3.12 .venv
+uv pip sync backend/requirements-linux.lock --python .venv/bin/python
+test -f .env || cp .env.example .env
 PYTHONPATH=backend .venv/bin/alembic -c backend/alembic.ini upgrade head
-PYTHONPATH=backend .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
-# 另一个终端
-npm --prefix frontend run dev
+npm --prefix frontend ci
+bash scripts/dev.sh
 ```
 
-## Docker Compose
+打开 [本地应用](http://127.0.0.1:5173)，首次使用在登录页**自行注册账号**。全新安装没有预置账号、密码或已有项目。API 文档为 <http://127.0.0.1:8000/docs>，健康检查为 <http://127.0.0.1:8000/api/v1/health>。`Ctrl+C` 停止开发服务。
 
-服务器的 systemd 部署、访问入口与维护步骤见 [服务器部署说明](docs/SERVER_DEPLOYMENT.md)。
+本地默认使用 SQLite 和进程内后台队列，无需额外安装 PostgreSQL、Redis 或 Celery 服务。前后端仅监听本机回环地址；数据写入被 Git 忽略的 `data/`。Windows 原生环境未验收，可在具备上述依赖的 Linux/WSL 环境中按 Linux 步骤运行。
 
-```bash
-cp .env.example .env  # 已有配置时不要覆盖
-docker compose up --build
-```
+## 演示模式与真实模型
 
-`migrate` 服务等待 PostgreSQL 健康后执行迁移；API 和 Celery worker 在迁移成功后启动，Redis 保存队列。Nginx 提供前端并代理 API/SSE。视频存储在共享 `media` 卷，数据库在 `postgres` 卷。访问地址仍为本地 5173，数据库和 Redis 不对宿主机暴露端口。
+`.env.example` 默认 `MODEL_PROVIDER=mock`，不含任何模型密钥。该模式可以体验账号、项目、视频上传、预处理和固定演示流程，不调用付费模型。首页的“体验演示项目”与场景按钮使用程序生成的几何分镜卡及固定标注，不能作为模型识别准确率证据。普通上传视频在该模式下不会获得真实视觉理解结论。
 
-Compose 路径暂未实机验收；本地已验证路径使用 SQLite + 一个进程内后台线程。账号隔离覆盖 API、视频文件与任务事件；多机部署仍需调整共享限流、文件存储、任务租约和运维恢复机制。
-
-## 目录与架构
-
-```text
-frontend/src/
-  pages/          项目、审看工作台、补拍与重剪建议
-  components/     视频播放器、AI 生成、任务与消息、图标
-  api/            HTTP 客户端、SSE/轮询
-  types/          前端数据契约
-backend/app/
-  api/            REST、SSE、媒体 Range 播放
-  models/         SQLAlchemy 项目/素材/分析/证据/需求/匹配/缺口/计划/任务/验收/粗剪/作业
-  schemas/        Pydantic 输入与模型输出验证
-  providers/      千问兼容协议、演示夹具、ASR、存储、素材源适配
-  services/       媒体预处理、诊断、规划、渲染
-  workflows/      分析快照、增量复用、验收与渲染调度
-  workers/        本地队列 / Celery
-backend/migrations/  Alembic 冻结的初始迁移
-backend/tests/       规则、媒体链路、版本隔离、Provider 协议测试
-scripts/             安装、开发、检查
-demo/                场景说明与演示步骤
-docs/                实施边界与验证记录
-```
-
-所有媒体时间采用原片相对秒 `[start, end)`。代理视频不改变速度，并检查时长偏差；通过 FFmpeg 时间戳处理可变帧率。镜头边界和模型时间范围是候选，不宣称帧级精确。缺口记录已搜索/失败范围，音频未分析时不会据画面断言对白不存在。
-
-后台任务创建时固定项目 revision、素材快照和 provider/模型/提示词/采样配置。旧任务完成只保留为历史版本。新增素材的证据可复用，需求和匹配重新计算。配置变化后旧分析任务不能跨模式重试，需发起新分析。用户确认与忽略通过独立修正层保留，后续模型分析不会覆盖。
-
-## 模型配置
-
-只修改本地 `.env`，不要把密钥放进前端、README 或提交到 Git：
+要分析自己的 Vlog，在本地 `.env` 中配置有权限的模型服务，然后重启 API；使用 Celery 时也要重启 worker：
 
 ```dotenv
 MODEL_PROVIDER=qwen
-MODEL_BASE_URL=https://你的WorkspaceId.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
-MODEL_API_KEY=你的本地密钥
+# 使用自己账号控制台提供的完整兼容接口地址。
+MODEL_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+MODEL_API_KEY=填入你自己的密钥
 VLM_MODEL=qwen3.8-max
 LLM_MODEL=qwen-plus
 ```
 
-重启 API；Compose 下也需重启 worker。页面显示真实模型/演示模式，不显示密钥。创建分析、验收或视频生成任务时，会将对应的采样帧、参考首帧及文本发送至配置的模型服务。
+使用百炼专属业务空间时，应将 `MODEL_BASE_URL` 替换为对应地域和业务空间的完整地址；模型名称、权限、额度及地域需与自己的账号匹配。应用接入的是 Chat Completions 兼容协议，以采样帧和文本执行视频理解，真实调用失败会显示错误，不会静默切回演示结果。密钥仅保存在后端环境中，不要写入前端或提交到 Git。
 
-接口采用千问官方 [Chat Completions 兼容协议](https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions)，通过 Base64 图片与源时间标签传入画面。专属域名按控制台完整复制，`WorkspaceId`、地域和密钥须对应；其他部署请使用自己账号提供的地址。上述两个模型已在本机真实调用通过，其他账号仍需确认模型权限与可用额度。
+### AI 视频生成
 
-本地依赖包含 `httpx[socks]`，支持本机配置的 SOCKS 代理。环境变量中的代理设置由 HTTP 客户端读取，不需要把代理地址写进源码。
-
-`MODEL_TIMEOUT_S` 默认 900 秒，控制单次模型响应读取等待；设为 `0` 可关闭读取等待限制。连接、上传与连接池分别保持 30/60/30 秒，整条后台分析没有该总时长限制。`MODEL_CONCURRENCY` 默认 8。同一 Vlog 的镜头并行理解，所有进程共享最多 8 个模型请求；视频处理最多 2 个 FFmpeg 同时运行，编解码与滤镜各设 4 线程预算。详见 [8 核并发设计](docs/CONCURRENCY.md)。限流/暂时性 HTTP 错误最多尝试 3 次，退避 1/2 秒。JSON schema 错误最多修复一次，仍失败则报错。日志仅记录模型名、耗时、输入帧数、输出状态和可用 token 用量，不写密钥或完整私有帧。
-
-可选 ASR：`ASR_BASE_URL`、`ASR_API_KEY`、`ASR_MODEL`。只支持返回带时间戳 `segments` 的兼容服务，不推断千问任意 ASR 型号都适用这一协议。无音轨直接跳过，未配置或失败保留状态。音频提取结果保留在本地素材目录。
-
-## 使用流程
-
-1. 创建 Vlog 项目，填写拍摄内容与想表达的重点；上传一条已经剪辑过的完整 Vlog。首次上传自动作为主片。
-2. 等待预处理完成，在工作台按镜头查看缩略图和原片时间范围。每页默认展示 10 个镜头，点击后播放对应片段。
-3. 点击分析，查看实际内容摘要、段落与最多 5 条值得改的意见。每条展开最多两段关键依据，明确“哪段画面、缺什么信息、怎么改”。音频或画面未完整分析时会提示不确定。
-4. 人工确认或忽略意见。在补拍任务页查看具体动作、景别、秒数、插入位置和验收条件；未确认意见不自动选入执行计划。
-5. 上传补充片段，或在已确认的补拍任务中展开“AI 生成补全片段”，选择首帧、调整描述与时长后生成。生成使用百炼额度，结果可预览、下载并提交验收。新增素材不会自动代替主 Vlog 或混入主片分析；验收通过后仍需要将它实际剪进视频。
-6. 根据重剪建议，在其他剪辑软件中调整镜头；下载需要的 AI 候选片段，与实拍补充素材一起剪入成片。叙光集不管理剪辑版本或导出成片。
-7. 旧项目可明确选择一个主 Vlog 后转换并重新分析，旧诊断保留为历史版本。
-
-当前限制：每项目最多 20 个文件、总时长 600 秒、单文件 256 MB；支持可解码的 MP4、MOV、WebM、MKV、AVI。
-
-支持 FFmpeg 默认编解码器；暂不直接解析 INSV/INSP 等专有容器。全景素材需先导出普通视角视频，来源标记为 `insta360_export`。
-
-## 环境变量
-
-完整变量见 `.env.example`。本地常用配置：
-
-|变量|默认|用途|
-|---|---|---|
-|`DATABASE_URL`|`sqlite:///./data/xuguangji.db`|本地数据库；Compose 使用 PostgreSQL|
-|`DATA_DIR`|`./data`|素材、代理、关键帧和导出目录|
-|`QUEUE_MODE`|`local`|`local` 或 `celery`|
-|`REDIS_URL`|`redis://localhost:6379/0`|Celery broker|
-|`MODEL_PROVIDER`|`mock`|`mock`、`qwen`、`compatible`|
-|`WINDOW_S` / `OVERLAP_S`|8 / 2|分析窗口与重叠秒数|
-|`SAMPLE_FPS`|1|旧版兼容配置；Vlog 流程按镜头内每窗口最多 4 帧抽样|
-|`FFMPEG_BIN` / `FFPROBE_BIN`|命令名|可指定安装位置|
-
-## 检查
-
-```bash
-bash scripts/check.sh
-# 分别执行
-PYTHONPATH=backend .venv/bin/pytest backend/tests -q
-npm --prefix frontend run build
+```dotenv
+VIDEO_GENERATION_ENABLED=true
+VIDEO_GENERATION_MODEL=happyhorse-1.1-i2v
+# 留空时由 MODEL_BASE_URL 的 /compatible-mode/v1 推导同空间 /api/v1。
+VIDEO_GENERATION_BASE_URL=
 ```
 
-测试在独立临时数据库与媒体目录执行，不操作工作区用户素材。真实媒体测试使用 FFmpeg 生成测试视频，检查预处理及素材 Range 下载；模型语义使用明确标注的夹具，不能替代真实模型效果评估。剪辑退役测试检查旧入口返回 410、禁止重试渲染，且历史数据库与文件保持不变。Provider 协议测试使用 HTTP 模拟响应。真实账号接入测试与自动化测试分开执行，详情见 `docs/VERIFICATION.md`。
+模板中的生成开关默认开启，但 **mock 模式或未配置真实密钥时仍不可生成**。真实生成还需要百炼模型权限与额度、有效的已确认补拍任务、来源可追溯的参考首帧，以及未过期的分析和补全计划。重剪任务不支持生成；不符合条件时页面会说明原因。
 
-## 当前限制
+支持请求 3–15 秒、480P/720P/1080P 的候选片段；生成与分析会使用外部模型服务额度。当前为单首帧生成，不能保证片段结尾与后一镜头自然衔接。详见 [HappyHorse 视频生成](docs/HAPPYHORSE_EXPERIMENT.md)。
 
-- 千问真实调用已打通；尚无实拍标注评测集与影石 SDK，因此不宣称叙事识别准确率或设备接入成功。纯色测试仅验证接入和处理链路。
-- Vlog 使用按镜头抽样及全片上下文审阅；复杂叠化可能漏检，快速运动或闪光可能误分，关键帧可能遗漏动作。多段分析失败保留覆盖记录，相关结论需要人工复核。
-- 计划采用可解释的固定候选与人工时间估计。已有素材补入在未证明有可用素材时不自动推荐；外部生成工具可用性需要创作者核实。首版未实现模型生成的复杂多任务依赖求解和成本自定义。
-- 人工修正覆盖意见确认/忽略；手动分镜合并/拆分、证据事实逐条改写尚未实现。
-- 剪辑、成片版本管理及成片导出已从产品移除，对应旧接口返回 410；历史表和媒体文件保留，AI 候选素材的预览与下载正常提供。没有专业剪辑轨道、字幕编辑或远程拍摄控制。
-- 应用本身仍是共享工作区原型；服务器按团队要求使用 HTTP 免登录入口，尚无独立成员账号与权限隔离。Docker 组合及 Redis/Celery 中断恢复尚需目标环境验证。
-- 行业调研、问卷、PPT、1 分钟路演视频和公开仓库发布属于后续比赛材料，本次未生成或上传。
+### 可选音频识别
+
+`ASR_BASE_URL`、`ASR_API_KEY`、`ASR_MODEL` 用于兼容 multipart `/audio/transcriptions`、并返回带时间戳 `segments` 的服务。默认未配置 ASR，音轨提取不代表已完成对白或音乐理解；音频未分析时不能据此断言原片没有对白或音乐。真实 ASR 服务尚未完成接入验收。
+
+## 推荐体验流程
+
+1. 注册并登录，创建 Vlog 项目，填写名称、审看重点和风格。
+2. 上传一条已剪好的完整 Vlog。等待预处理，检查镜头列表、时间范围与回放。
+3. 在真实模型环境中发起分析，查看建议并点击关键证据回看原片；结合创作意图确认或忽略建议。
+4. 生成补拍与重剪清单。对重剪任务复制建议，在外部剪辑软件中操作。
+5. 对补拍任务上传补充视频，或选择参考首帧生成 AI 候选，再提交复核。
+6. 阅读逐项复核结果，下载需要的 AI 片段，在外部软件中完成最终剪辑。
+
+新增补充素材不会自动替换主片。更换主 Vlog、修改创作需求或已有更新分析后，应使用匹配的新分析和清单。新建 AI 生成任务要求模型配置与原分析一致；补拍复核可按当前模型重新理解补充片段，单纯升级真实模型或提示词不必重建原任务，主片、需求和最新分析等关联校验仍然生效。
+
+默认容量：每项目最多 20 个文件、累计 600 秒、单文件 256 MB；支持 FFmpeg 可解码的 MP4、MOV、WebM、MKV、AVI。影石素材需要先导出普通视角视频，不直接解析 INSV/INSP，未接入影石 SDK。
+
+## 技术结构
+
+前端使用 React、TypeScript、Vite；后端使用 FastAPI、Pydantic、SQLAlchemy、Alembic；视频处理由 FFmpeg/ffprobe 完成。真实模型将视觉理解与全片文字审阅分开，默认配置分别为 `qwen3.8-max` 和 `qwen-plus`。
+
+```text
+frontend/src/            项目、审看、补拍任务及账号界面
+frontend/tests/          前端结果状态回归测试
+backend/app/api/         REST、SSE、媒体访问及生成接口
+backend/app/providers/   模型、ASR、存储及素材源适配
+backend/app/services/    媒体处理、诊断、规划、复核及生成
+backend/app/workflows/   后台工作流与结果快照
+backend/app/workers/     本地队列与 Celery 入口
+backend/migrations/     数据库迁移
+backend/tests/          账号隔离、媒体链路、结构校验及工作流测试
+scripts/                安装、开发、检查工具
+demo/                   固定演示案例说明
+docs/                   提交说明、架构、账号与验证记录
+```
+
+媒体时间以原片相对秒 `[start, end)` 表示。镜头边界是检测候选，不保证帧级精确；显示时间保留到小数点后一位，内部计算仍保存精度。旧剪辑实现与历史表仅用于兼容和退役验证，当前产品不开放成片剪辑/导出入口。
+
+### 常用配置
+
+|变量|默认值|用途|
+|---|---|---|
+|`DATABASE_URL`|`sqlite:///./data/xuguangji.db`|本地数据库|
+|`DATA_DIR`|`./data`|原片、代理、关键帧及生成素材|
+|`QUEUE_MODE`|`local`|本地队列；可选 `celery`|
+|`MODEL_PROVIDER`|`mock`|演示模式；真实接入可选 `qwen`/`compatible`|
+|`MODEL_CONCURRENCY`|8|同一部署共享的模型并发槽位上限|
+|`MODEL_TIMEOUT_S`|900|单次模型响应读取等待；`0` 关闭此读取限制|
+|`MEDIA_CONCURRENCY` / `FFMPEG_THREADS`|2 / 4|并行媒体命令数与每条命令线程预算|
+|`VIDEO_GENERATION_CONCURRENCY`|1|独立的视频生成并发上限|
+|`AUTH_SESSION_DAYS`|14|账号会话有效期|
+|`AUTH_COOKIE_SECURE`|false|本地 HTTP 配置；HTTPS 部署时设为 true|
+
+900 秒不是整个分析流程的总时长限制；连接、上传等仍有独立超时。并发数可按本机资源和模型服务限流调整，8 路请求不代表所有设备都能获得相同加速。完整配置见 [.env.example](.env.example)，设计见 [并发说明](docs/CONCURRENCY.md)。
+
+## 检查与测试
+
+安装依赖后在仓库根目录执行：
+
+```bash
+# 后端测试 + TypeScript 检查与前端构建
+bash scripts/check.sh
+
+# 前端补拍复核状态测试（Node.js 24）
+node --test frontend/tests/verification.test.ts
+```
+
+后端测试使用独立临时数据库与媒体目录；真实媒体测试用 FFmpeg 生成测试视频，模型协议测试使用模拟响应。自动化测试通过不代表模型建议全部正确，也不等于已完成所有浏览器、真实 ASR 或大规模用户验收。历史验证记录见 [VERIFICATION.md](docs/VERIFICATION.md)，其中旧版本的剪辑、导出及免登录行为不属于当前产品。
+
+## 可选部署与已知限制
+
+仓库提供 [Docker Compose](docker-compose.yml) 和 [服务器部署说明](docs/SERVER_DEPLOYMENT.md)。Compose 包括 PostgreSQL、Redis、迁移、API、worker 与 Web，**该路径尚未完成容器实机验收**；首次评审建议使用上述本地流程。部署文档用于参考，不是运行源码包的必做步骤。
+
+- 转场检测与关键帧抽样可能漏掉快速动作、复杂叠化或细小文字；模型也可能混淆字幕与场景内容、推断未呈现的事件。建议及时间边界仍需回看核实。
+- 没有实拍标注评测集，因此不宣称叙事识别准确率。AI 生成画面是创作候选，不能证明真实到访或事件发生。
+- 未实现手动分镜拆合、逐条改写证据、专业剪辑轨道、字幕编辑、相机遥控或影石 SDK 接入。
+- 用户管理为基础账号隔离；没有邮箱找回密码、角色权限管理或企业级身份体系。多 API 实例需进一步完善共享限流、存储及恢复机制。
+- 真实模型依赖网络、账号权限与额度；生成提交状态不明确时可能阻止重新提交，以避免重复计费。
+
+进一步阅读：[提交说明](docs/SUBMISSION.md) · [系统架构](docs/VLOG_ARCHITECTURE.md) · [账号与项目管理](docs/ACCOUNTS.md) · [AI 生成](docs/HAPPYHORSE_EXPERIMENT.md)
