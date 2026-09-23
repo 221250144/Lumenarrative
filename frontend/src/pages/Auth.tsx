@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { post } from "../api/client";
 import type { User } from "../components/AccountMenu";
-import { Icon } from "../components/Icon";
+import { BrandMark } from "../components/BrandMark";
 
 export function Auth({
   onAuthenticated,
@@ -18,9 +18,9 @@ export function Auth({
       <section className="auth-card">
         <div className="auth-brand">
           <span className="brand-mark">
-            <Icon name="sun" size={27} />
+            <BrandMark size={40} />
           </span>
-          <h1>旭光集</h1>
+          <h1>叙光集</h1>
         </div>
         <h2>{mode === "login" ? "登录创作空间" : "创建账号"}</h2>
         <form

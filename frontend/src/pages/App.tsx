@@ -19,6 +19,7 @@ import type {
   Health,
 } from "../types";
 import { Icon } from "../components/Icon";
+import { BrandMark } from "../components/BrandMark";
 import { NotificationCenter } from "../components/NotificationCenter";
 import { copyText } from "../lib/clipboard";
 import { Projects } from "./Projects";
@@ -383,14 +384,14 @@ function Workspace({
       <aside className="sidebar">
         <button className="brand" onClick={() => navigate("projects")}>
           <span className="brand-mark">
-            <Icon name="sun" size={27} />
+            <BrandMark size={40} />
           </span>
           <span>
-            旭光集<small>LUMENARRATIVE</small>
+            叙光集<small>LUMENARRATIVE</small>
           </span>
         </button>
         <div className="space-label">
-          <span className="space-avatar">旭</span>
+          <span className="space-avatar">叙</span>
           <div>我的创作空间</div>
         </div>
         <nav>
@@ -416,7 +417,7 @@ function Workspace({
         <div className="sidebar-spacer" />
         <div className="sidebar-note">
           <div className="note-sun">
-            <Icon name="sun" size={22} />
+            <BrandMark size={32} />
           </div>
           <p>
             镜头有限，

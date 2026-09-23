@@ -8,5 +8,5 @@ npm --prefix frontend run dev &
 web_pid=$!
 cleanup() { kill "$api_pid" "$web_pid" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
-echo '旭光集：http://127.0.0.1:5173'
+echo '叙光集：http://127.0.0.1:5173'
 wait "$api_pid" "$web_pid"

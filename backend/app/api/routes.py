@@ -213,7 +213,7 @@ def asset_json(asset):
 @router.get("/health")
 def health():
     return {
-        "name": "旭光集",
+        "name": "叙光集",
         "provider": settings.model_provider,
         "model_configured": bool(settings.model_api_key),
         "queue_mode": settings.queue_mode,
@@ -768,7 +768,7 @@ def edit_video(id: str, db: DB):
     return FileResponse(
         storage.path(edit.output_key),
         media_type="video/mp4",
-        filename="旭光集-粗剪.mp4",
+        filename="叙光集-粗剪.mp4",
         content_disposition_type="inline",
     )
 

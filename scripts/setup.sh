@@ -10,4 +10,4 @@ uv pip sync backend/requirements.lock --python .venv/bin/python
 if [ ! -f .env ]; then cp .env.example .env; fi
 PYTHONPATH=backend .venv/bin/alembic -c backend/alembic.ini upgrade head
 npm --prefix frontend ci
-echo '依赖已就绪。运行 bash scripts/dev.sh 启动旭光集。'
+echo '依赖已就绪。运行 bash scripts/dev.sh 启动叙光集。'
