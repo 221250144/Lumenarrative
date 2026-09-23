@@ -144,4 +144,3 @@ def test_ambiguous_partial_cache_falls_back_without_cross_window_evidence(corrup
     assert sorted(model.calls) == [0, 1, 2] and not failures and not cached
     assert len(second) == 6
     assert all(item["asset_id"] == asset.id for item in second)
-
