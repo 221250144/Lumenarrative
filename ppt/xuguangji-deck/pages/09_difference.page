@@ -1,0 +1,97 @@
+pageType: content
+background:
+  type: solid
+  color: "$bg"
+elements:
+  - elementId: kicker
+    elementType: text
+    bounds: [56, 52, 500, 14]
+    content:
+      style: "$kick"
+      wrap: false
+      text: 08 / 差异 DIFFERENCE
+  - elementId: title
+    elementType: text
+    bounds: [56, 88, 800, 36]
+    content:
+      style: "$h2"
+      wrap: false
+      text: 不是多一层点评，是多一双片场眼睛。
+  - elementId: table
+    elementType: table
+    bounds: [56, 152, 848, 288]
+    columnWidths: [0.18, 0.38, 0.44]
+    rowHeights: [0.14, 0.172, 0.172, 0.172, 0.172, 0.172]
+    style:
+      cellStyle:
+        color: "$sub"
+        fontSize: 11
+        fontFamily: {latin: Liter, ea: MiSans}
+        lineHeight: 1.5
+        align: [left, middle]
+        fill: {type: solid, color: "$bg"}
+        border: [null, null, {style: solid, width: 1, color: "$line"}, null]
+      firstRowStyle:
+        color: "$gold"
+        fontSize: 11
+        bold: true
+        fontFamily: {latin: Liter, ea: MiSans}
+        align: [left, middle]
+        fill: {type: solid, color: "$bg"}
+        border: [null, null, {style: solid, width: 1, color: "$gold"}, null]
+      firstColumnStyle:
+        color: "$ink"
+        fontSize: 11
+        bold: true
+        fontFamily: {latin: Liter, ea: MiSans}
+        align: [left, middle]
+    rows:
+      - - text: ""
+        - text: 普通 AI 点评
+        - text: 旭光集
+      - - text: 反馈粒度
+        - text: 整体感受：节奏、氛围、完整度
+        - text: 定位到镜头与原片秒数
+      - - text: 证据来源
+        - text: 无出处，无法复核
+        - text: 最多两段关键证据，点击回看片段
+      - - text: 修改动作
+        - text: 建议重写或重拍全部
+        - text: 景别、秒数、插入位置、验收条件齐备
+      - - text: 执行路径
+        - text: 创作者从零摸索
+        - text: 补拍清单加 AI 候选片段，按时间筛选
+      - - text: 与创作的关系
+        - text: 常常试图替代创作者判断
+        - text: 不碰时间线，确认与忽略由人决定
+  - elementId: note
+    elementType: text
+    bounds: [56, 456, 848, 20]
+    content:
+      fontSize: 11
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      wrap: false
+      text: 普通跳切、日常蒙太奇、缺少标准开头结尾，都不自动构成问题；允许零条建议。
+  - elementId: foot-line
+    elementType: line
+    bounds: [56, 500, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-l
+    elementType: text
+    bounds: [56, 508, 400, 12]
+    content:
+      style: "$foot"
+      wrap: false
+      text: 旭光集 LUMENARRATIVE
+  - elementId: foot-r
+    elementType: text
+    bounds: [504, 508, 400, 12]
+    content:
+      style: "$foot"
+      align: [right, top]
+      wrap: false
+      text: 09 / 12

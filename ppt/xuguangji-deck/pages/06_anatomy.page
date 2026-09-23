@@ -1,0 +1,205 @@
+pageType: content
+background:
+  type: solid
+  color: "$bg"
+elements:
+  - elementId: kicker
+    elementType: text
+    bounds: [56, 52, 500, 14]
+    content:
+      style: "$kick"
+      wrap: false
+      text: 05 / 建议解剖 ANATOMY
+  - elementId: title
+    elementType: text
+    bounds: [56, 88, 800, 36]
+    content:
+      style: "$h2"
+      wrap: false
+      text: 一条建议 = 画面事实 + 理解障碍 + 修改动作。
+  - elementId: l1-label
+    elementType: text
+    bounds: [56, 150, 120, 18]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 观察到什么
+  - elementId: l1-body
+    elementType: text
+    bounds: [56, 172, 460, 48]
+    content:
+      fontSize: 12
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.65
+      text: 前一镜是地铁站指示牌下行进入站台层，下一镜直接出现「香积寺」石面标牌，中间没有任何过渡。
+  - elementId: l-line-1
+    elementType: line
+    bounds: [56, 230, 460, 1]
+    viewBox: [460, 1]
+    points: "0,0.5 460,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: l2-label
+    elementType: text
+    bounds: [56, 246, 120, 18]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 哪里不清楚
+  - elementId: l2-body
+    elementType: text
+    bounds: [56, 268, 460, 48]
+    content:
+      fontSize: 12
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.65
+      text: 观众无法理解如何从地铁站到达寺庙，空间衔接断裂，地理真实感被削弱。
+  - elementId: l-line-2
+    elementType: line
+    bounds: [56, 326, 460, 1]
+    viewBox: [460, 1]
+    points: "0,0.5 460,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: l3-label
+    elementType: text
+    bounds: [56, 342, 120, 18]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 建议这样改
+  - elementId: l3-body
+    elementType: text
+    bounds: [56, 364, 460, 48]
+    content:
+      fontSize: 12
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.65
+      text: 在 00:24.4 之前插入一段 3–5 秒车载街景，暗示出站后乘车或步行抵达；能用已有画面解决，就不劳动创作者出门。
+  - elementId: l-line-3
+    elementType: line
+    bounds: [56, 422, 460, 1]
+    viewBox: [460, 1]
+    points: "0,0.5 460,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: ev-label
+    elementType: text
+    bounds: [560, 150, 344, 18]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 关键证据 · 2 段
+  - elementId: ev1-code
+    elementType: text
+    bounds: [560, 176, 344, 16]
+    content:
+      fontSize: 11
+      color: "$goldsoft"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: SHOT 05 · 00:19.5 – 00:24.4
+  - elementId: ev1-body
+    elementType: text
+    bounds: [560, 194, 344, 36]
+    content:
+      fontSize: 10.5
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.55
+      text: 指示牌下行进入站台层，全程没有出站或换乘画面。
+  - elementId: ev2-code
+    elementType: text
+    bounds: [560, 240, 344, 16]
+    content:
+      fontSize: 11
+      color: "$goldsoft"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: SHOT 06 · 00:24.4 – 00:25.9
+  - elementId: ev2-body
+    elementType: text
+    bounds: [560, 258, 344, 36]
+    content:
+      fontSize: 10.5
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.55
+      text: 香积寺石面标牌近景，画面仅有轻微取景位移。
+  - elementId: ev-line
+    elementType: line
+    bounds: [560, 306, 344, 1]
+    viewBox: [344, 1]
+    points: "0,0.5 344,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: ac-label
+    elementType: text
+    bounds: [560, 320, 344, 18]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 验收条件
+  - elementId: ac-body
+    elementType: text
+    bounds: [560, 342, 344, 84]
+    content:
+      fontSize: 10.5
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.7
+      text: |
+        <p>01 标牌前出现至少 3 秒街道行驶或窗外景</p>
+        <p>02 无硬切，保持运动连贯</p>
+        <p>03 不遮挡标牌镜头的起始构图</p>
+  - elementId: note
+    elementType: text
+    bounds: [56, 452, 848, 20]
+    content:
+      fontSize: 11
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      wrap: false
+      text: 建议锚定真实镜头与源时间，引用校验不通过就不进入清单。
+  - elementId: foot-line
+    elementType: line
+    bounds: [56, 500, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-l
+    elementType: text
+    bounds: [56, 508, 400, 12]
+    content:
+      style: "$foot"
+      wrap: false
+      text: 旭光集 LUMENARRATIVE
+  - elementId: foot-r
+    elementType: text
+    bounds: [504, 508, 400, 12]
+    content:
+      style: "$foot"
+      align: [right, top]
+      wrap: false
+      text: 06 / 12

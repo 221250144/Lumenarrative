@@ -1,0 +1,176 @@
+pageType: content
+background:
+  type: solid
+  color: "$bg"
+elements:
+  - elementId: kicker
+    elementType: text
+    bounds: [56, 52, 400, 14]
+    content:
+      style: "$kick"
+      wrap: false
+      text: 01 / 洞察 INSIGHT
+  - elementId: statement
+    elementType: text
+    bounds: [56, 116, 440, 200]
+    content:
+      style: "$h1"
+      fontSize: 31
+      lineHeight: 1.4
+      text: |
+        <p>剪完的那一刻，</p>
+        <p>没有人告诉他</p>
+        <p>还缺哪一镜。</p>
+  - elementId: lead
+    elementType: text
+    bounds: [56, 330, 420, 90]
+    content:
+      style: "$body"
+      text: 旭光集从这一刻开始：把成片逐镜头读一遍，指出观众会在哪里看不懂，并给出能在现场执行的补拍与重剪动作。
+  - elementId: quote
+    elementType: text
+    bounds: [56, 452, 420, 20]
+    content:
+      fontSize: 12
+      color: "$goldsoft"
+      fontFamily: {latin: Liter, ea: MiSans}
+      italic: true
+      wrap: false
+      text: 观众只看一遍。
+  - elementId: r-line-0
+    elementType: line
+    bounds: [540, 120, 364, 1]
+    viewBox: [364, 1]
+    points: "0,0.5 364,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: r1-num
+    elementType: text
+    bounds: [540, 136, 48, 24]
+    content:
+      fontSize: 18
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: "01"
+  - elementId: r1-title
+    elementType: text
+    bounds: [600, 138, 304, 22]
+    content:
+      fontSize: 15
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 衔接靠感觉
+  - elementId: r1-body
+    elementType: text
+    bounds: [600, 162, 304, 44]
+    content:
+      fontSize: 11
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: 剪得好不好、交代清不清楚，只能等发布之后自己猜。
+  - elementId: r-line-1
+    elementType: line
+    bounds: [540, 216, 364, 1]
+    viewBox: [364, 1]
+    points: "0,0.5 364,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: r2-num
+    elementType: text
+    bounds: [540, 232, 48, 24]
+    content:
+      fontSize: 18
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: "02"
+  - elementId: r2-title
+    elementType: text
+    bounds: [600, 234, 304, 22]
+    content:
+      fontSize: 15
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 反馈落不了地
+  - elementId: r2-body
+    elementType: text
+    bounds: [600, 258, 304, 44]
+    content:
+      fontSize: 11
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: 「节奏有点怪」「内容有点散」，都对，但没说改哪一秒。
+  - elementId: r-line-2
+    elementType: line
+    bounds: [540, 312, 364, 1]
+    viewBox: [364, 1]
+    points: "0,0.5 364,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: r3-num
+    elementType: text
+    bounds: [540, 328, 48, 24]
+    content:
+      fontSize: 18
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: "03"
+  - elementId: r3-title
+    elementType: text
+    bounds: [600, 330, 304, 22]
+    content:
+      fontSize: 15
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 补拍靠记忆
+  - elementId: r3-body
+    elementType: text
+    bounds: [600, 354, 304, 44]
+    content:
+      fontSize: 11
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: 回到现场想不起景别、朝向和秒数，补一次拍废一次。
+  - elementId: r-line-3
+    elementType: line
+    bounds: [540, 408, 364, 1]
+    viewBox: [364, 1]
+    points: "0,0.5 364,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-line
+    elementType: line
+    bounds: [56, 500, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-l
+    elementType: text
+    bounds: [56, 508, 400, 12]
+    content:
+      style: "$foot"
+      wrap: false
+      text: 旭光集 LUMENARRATIVE
+  - elementId: foot-r
+    elementType: text
+    bounds: [504, 508, 400, 12]
+    content:
+      style: "$foot"
+      align: [right, top]
+      wrap: false
+      text: 02 / 12

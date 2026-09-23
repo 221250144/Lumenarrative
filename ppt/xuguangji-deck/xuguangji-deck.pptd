@@ -1,0 +1,65 @@
+version: v2
+title: 旭光集 · Vlog 镜头诊断与补拍助手
+size: [960, 540]
+theme:
+  colors:
+    bg: "#0C0C0C"
+    panel: "#171715"
+    ink: "#F4F1E8"
+    sub: "#A8A59B"
+    mute: "#6B6961"
+    line: "#2B2A26"
+    gold: "#D8BC3C"
+    goldsoft: "#E9D478"
+  textStyles:
+    kick:
+      fontSize: 10
+      color: "$gold"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      letterSpacing: 3
+    h1:
+      fontSize: 44
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: 阿里妈妈数黑体}
+      bold: true
+      lineHeight: 1.3
+    h2:
+      fontSize: 24
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: 阿里妈妈数黑体}
+      bold: true
+      lineHeight: 1.35
+    body:
+      fontSize: 12
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.75
+    cap:
+      fontSize: 9
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      letterSpacing: 2
+    num:
+      fontSize: 56
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+    foot:
+      fontSize: 8.5
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      letterSpacing: 2
+pages:
+  - pages/01_cover.page
+  - pages/02_insight.page
+  - pages/03_product.page
+  - pages/04_flow.page
+  - pages/05_workbench.page
+  - pages/06_anatomy.page
+  - pages/07_plan.page
+  - pages/08_generation.page
+  - pages/09_difference.page
+  - pages/10_status.page
+  - pages/11_next.page
+  - pages/12_final.page

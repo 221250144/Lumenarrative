@@ -1,0 +1,127 @@
+pageType: content
+background:
+  type: solid
+  color: "$bg"
+elements:
+  - elementId: kicker
+    elementType: text
+    bounds: [56, 52, 500, 14]
+    content:
+      style: "$kick"
+      wrap: false
+      text: 04 / 界面实拍 INTERFACE
+  - elementId: title
+    elementType: text
+    bounds: [56, 88, 700, 36]
+    content:
+      style: "$h2"
+      wrap: false
+      text: 审看工作台：每个镜头都有来处和去处。
+  - elementId: shot
+    elementType: image
+    bounds: [56, 148, 560, 324]
+    src: media/ui-workbench.png
+    fit: {mode: cover}
+    crop: {top: 0, bottom: 0.22, left: 0, right: 0}
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: a1-tick
+    elementType: shape
+    bounds: [648, 152, 14, 3]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: a1-title
+    elementType: text
+    bounds: [648, 164, 256, 20]
+    content:
+      fontSize: 14
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 镜头切分
+  - elementId: a1-body
+    elementType: text
+    bounds: [648, 186, 256, 60]
+    content:
+      fontSize: 10.5
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: 25 个镜头连续覆盖全片，按原片时间 [start, end) 定位，点击即播对应片段。
+  - elementId: a2-tick
+    elementType: shape
+    bounds: [648, 258, 14, 3]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: a2-title
+    elementType: text
+    bounds: [648, 270, 256, 20]
+    content:
+      fontSize: 14
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 章节定位
+  - elementId: a2-body
+    elementType: text
+    bounds: [648, 292, 256, 60]
+    content:
+      fontSize: 10.5
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: 全片自动归为 6 个章节，长片也能先找段落、再看镜头。
+  - elementId: a3-tick
+    elementType: shape
+    bounds: [648, 364, 14, 3]
+    shapeName: rect
+    fill: {type: solid, color: "$gold"}
+  - elementId: a3-title
+    elementType: text
+    bounds: [648, 376, 256, 20]
+    content:
+      fontSize: 14
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 审看重点
+  - elementId: a3-body
+    elementType: text
+    bounds: [648, 398, 256, 60]
+    content:
+      fontSize: 10.5
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: 创作者写下想表达的重点，模型与画面一起读，不自行脑补意图。
+  - elementId: shot-cap
+    elementType: text
+    bounds: [56, 480, 560, 14]
+    content:
+      style: "$cap"
+      wrap: false
+      text: 实拍界面 · 「杭州一日游」审看工作台
+  - elementId: foot-line
+    elementType: line
+    bounds: [56, 500, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-l
+    elementType: text
+    bounds: [56, 508, 400, 12]
+    content:
+      style: "$foot"
+      wrap: false
+      text: 旭光集 LUMENARRATIVE
+  - elementId: foot-r
+    elementType: text
+    bounds: [504, 508, 400, 12]
+    content:
+      style: "$foot"
+      align: [right, top]
+      wrap: false
+      text: 05 / 12

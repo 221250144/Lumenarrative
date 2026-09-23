@@ -1,0 +1,160 @@
+pageType: content
+background:
+  type: solid
+  color: "$bg"
+elements:
+  - elementId: kicker
+    elementType: text
+    bounds: [56, 52, 500, 14]
+    content:
+      style: "$kick"
+      wrap: false
+      text: 09 / 现状 STATUS
+  - elementId: title
+    elementType: text
+    bounds: [56, 88, 800, 36]
+    content:
+      style: "$h2"
+      wrap: false
+      text: 已经跑在真实服务器上，面对真实素材。
+  - elementId: n1
+    elementType: text
+    bounds: [56, 168, 200, 72]
+    content:
+      style: "$num"
+      fontSize: 60
+      wrap: false
+      text: "8"
+  - elementId: n1-label
+    elementType: text
+    bounds: [56, 244, 220, 44]
+    content:
+      fontSize: 11
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: |
+        <p>路镜头视觉理解并行</p>
+        <p>全部 worker 共享限额</p>
+  - elementId: n2
+    elementType: text
+    bounds: [330, 208, 200, 72]
+    content:
+      style: "$num"
+      fontSize: 60
+      wrap: false
+      text: "5"
+  - elementId: n2-label
+    elementType: text
+    bounds: [330, 284, 220, 44]
+    content:
+      fontSize: 11
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: |
+        <p>条单片定位建议上限</p>
+        <p>允许零条，不硬凑问题</p>
+  - elementId: n3
+    elementType: text
+    bounds: [600, 168, 160, 72]
+    content:
+      style: "$num"
+      fontSize: 60
+      wrap: false
+      text: "2"
+  - elementId: n3-label
+    elementType: text
+    bounds: [600, 244, 200, 44]
+    content:
+      fontSize: 11
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: |
+        <p>段关键证据每条建议</p>
+        <p>锚定镜头与源时间</p>
+  - elementId: n4
+    elementType: text
+    bounds: [780, 214, 124, 56]
+    content:
+      style: "$num"
+      fontSize: 42
+      wrap: false
+      text: 3–15
+  - elementId: n4-label
+    elementType: text
+    bounds: [772, 276, 132, 44]
+    content:
+      fontSize: 11
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.6
+      text: |
+        <p>秒 AI 候选片段</p>
+        <p>首帧生成可验收</p>
+  - elementId: mid-line
+    elementType: line
+    bounds: [56, 344, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: s1
+    elementType: text
+    bounds: [56, 362, 280, 56]
+    content:
+      fontSize: 11
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.65
+      text: 千问 qwen3.8-max 图片理解、qwen-plus 全片审阅，真实调用与结构校验通过
+  - elementId: s2
+    elementType: text
+    bounds: [356, 362, 240, 56]
+    content:
+      fontSize: 11
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.65
+      text: FFmpeg 真实转码、切分与抽帧，可变帧率按时间戳处理
+  - elementId: s3
+    elementType: text
+    bounds: [616, 362, 288, 56]
+    content:
+      fontSize: 11
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.65
+      text: PostgreSQL / Redis / Celery 已在 Ubuntu 服务器部署，真实任务验证
+  - elementId: note
+    elementType: text
+    bounds: [56, 448, 848, 18]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      wrap: false
+      text: 在线入口 47.110.79.237 · 演示与真实模式在页面明确显示，未识别时不假装已识别。
+  - elementId: foot-line
+    elementType: line
+    bounds: [56, 500, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-l
+    elementType: text
+    bounds: [56, 508, 400, 12]
+    content:
+      style: "$foot"
+      wrap: false
+      text: 旭光集 LUMENARRATIVE
+  - elementId: foot-r
+    elementType: text
+    bounds: [504, 508, 400, 12]
+    content:
+      style: "$foot"
+      align: [right, top]
+      wrap: false
+      text: 10 / 12

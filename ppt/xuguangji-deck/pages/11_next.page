@@ -1,0 +1,156 @@
+pageType: content
+background:
+  type: solid
+  color: "$bg"
+elements:
+  - elementId: ring
+    elementType: shape
+    bounds: [800, 360, 240, 240]
+    shapeName: donut
+    adjustments: [3000]
+    fill: {type: solid, color: "$gold"}
+    opacity: 0.25
+  - elementId: kicker
+    elementType: text
+    bounds: [56, 52, 500, 14]
+    content:
+      style: "$kick"
+      wrap: false
+      text: 10 / 下一步 NEXT
+  - elementId: title
+    elementType: text
+    bounds: [56, 88, 700, 36]
+    content:
+      style: "$h2"
+      wrap: false
+      text: 从一条成片，到一个设备生态。
+  - elementId: r1-tag
+    elementType: text
+    bounds: [56, 172, 80, 16]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: NEAR
+  - elementId: r1-title
+    elementType: text
+    bounds: [140, 168, 300, 22]
+    content:
+      fontSize: 16
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 接入影石设备生态
+  - elementId: r1-body
+    elementType: text
+    bounds: [460, 168, 444, 44]
+    content:
+      fontSize: 11.5
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.65
+      text: SDK 适配接口已预留；全景素材导出为普通视角视频后即可进入分析，来源全程可溯。
+  - elementId: r-line-1
+    elementType: line
+    bounds: [56, 228, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: r2-tag
+    elementType: text
+    bounds: [56, 262, 80, 16]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: MID
+  - elementId: r2-title
+    elementType: text
+    bounds: [140, 258, 300, 22]
+    content:
+      fontSize: 16
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 用验收数据校准建议
+  - elementId: r2-body
+    elementType: text
+    bounds: [460, 258, 444, 44]
+    content:
+      fontSize: 11.5
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.65
+      text: 积累补拍与 AI 片段的真实验收结果，让「拍到什么算通过」越来越准。
+  - elementId: r-line-2
+    elementType: line
+    bounds: [56, 318, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: r3-tag
+    elementType: text
+    bounds: [56, 352, 80, 16]
+    content:
+      fontSize: 11
+      color: "$gold"
+      fontFamily: Liter
+      bold: true
+      wrap: false
+      text: FAR
+  - elementId: r3-title
+    elementType: text
+    bounds: [140, 348, 300, 22]
+    content:
+      fontSize: 16
+      color: "$ink"
+      fontFamily: {latin: Liter, ea: MiSans}
+      bold: true
+      wrap: false
+      text: 把诊断移到拍摄之前
+  - elementId: r3-body
+    elementType: text
+    bounds: [460, 348, 444, 44]
+    content:
+      fontSize: 11.5
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.65
+      text: 从事后补拍走向现场提示：让第一遍就拍对，补拍清单越来越短。
+  - elementId: r-line-3
+    elementType: line
+    bounds: [56, 408, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-line
+    elementType: line
+    bounds: [56, 500, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-l
+    elementType: text
+    bounds: [56, 508, 400, 12]
+    content:
+      style: "$foot"
+      wrap: false
+      text: 旭光集 LUMENARRATIVE
+  - elementId: foot-r
+    elementType: text
+    bounds: [504, 508, 400, 12]
+    content:
+      style: "$foot"
+      align: [right, top]
+      wrap: false
+      text: 11 / 12

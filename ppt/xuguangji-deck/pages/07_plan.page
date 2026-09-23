@@ -1,0 +1,123 @@
+pageType: content
+background:
+  type: solid
+  color: "$bg"
+elements:
+  - elementId: kicker
+    elementType: text
+    bounds: [56, 52, 500, 14]
+    content:
+      style: "$kick"
+      wrap: false
+      text: 06 / 界面实拍 INTERFACE
+  - elementId: title
+    elementType: text
+    bounds: [56, 92, 350, 76]
+    content:
+      style: "$h2"
+      text: |
+        <p>补拍与重剪清单：</p>
+        <p>把答案一起交出去。</p>
+  - elementId: n1
+    elementType: text
+    bounds: [56, 196, 120, 48]
+    content:
+      style: "$num"
+      fontSize: 40
+      wrap: false
+      text: "3"
+  - elementId: n1-label
+    elementType: text
+    bounds: [56, 246, 150, 30]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.5
+      text: 推荐执行任务
+  - elementId: n2
+    elementType: text
+    bounds: [216, 216, 120, 48]
+    content:
+      style: "$num"
+      fontSize: 40
+      wrap: false
+      text: "25"
+  - elementId: n2-label
+    elementType: text
+    bounds: [216, 266, 150, 30]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.5
+      text: 预计人工投入 · 分钟
+  - elementId: n3
+    elementType: text
+    bounds: [56, 306, 120, 48]
+    content:
+      style: "$num"
+      fontSize: 40
+      wrap: false
+      text: "2"
+  - elementId: n3-label
+    elementType: text
+    bounds: [56, 356, 180, 30]
+    content:
+      fontSize: 10
+      color: "$mute"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.5
+      text: 尚未覆盖的缺口，如实标注
+  - elementId: bullets
+    elementType: text
+    bounds: [216, 316, 190, 110]
+    content:
+      fontSize: 11
+      color: "$sub"
+      fontFamily: {latin: Liter, ea: MiSans}
+      lineHeight: 1.7
+      text: |
+        <p>· 每个任务带景别、秒数、</p>
+        <p style="margin-left:10px">插入位置与验收条件</p>
+        <p>· 重剪建议一键复制，</p>
+        <p style="margin-left:10px">直接带进剪辑软件</p>
+        <p>· 按可投入时间筛选，</p>
+        <p style="margin-left:10px">先做最值得做的</p>
+  - elementId: shot
+    elementType: image
+    bounds: [430, 92, 474, 384]
+    src: media/ui-plan.png
+    fit: {mode: cover}
+    crop: {top: 0, bottom: 0.52, left: 0, right: 0}
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: shot-cap
+    elementType: text
+    bounds: [430, 484, 474, 14]
+    content:
+      style: "$cap"
+      align: [right, top]
+      wrap: false
+      text: 实拍界面 · 补拍与重剪清单
+  - elementId: foot-line
+    elementType: line
+    bounds: [56, 500, 848, 1]
+    viewBox: [848, 1]
+    points: "0,0.5 848,0.5"
+    curve: sharp
+    border: {style: solid, width: 1, color: "$line"}
+  - elementId: foot-l
+    elementType: text
+    bounds: [56, 508, 400, 12]
+    content:
+      style: "$foot"
+      wrap: false
+      text: 旭光集 LUMENARRATIVE
+  - elementId: foot-r
+    elementType: text
+    bounds: [504, 508, 400, 12]
+    content:
+      style: "$foot"
+      align: [right, top]
+      wrap: false
+      text: 07 / 12
