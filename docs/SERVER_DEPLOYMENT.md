@@ -1,14 +1,14 @@
 # 旭光集服务器部署
 
-部署日期：2026-09-22。服务器：`47.110.79.237`，Ubuntu 24.04、8 vCPU、28 GiB 内存。
+最近部署日期：2026-09-23。服务器：`47.110.79.237`，Ubuntu 24.04、8 vCPU、28 GiB 内存。
 
 ## 当前状态
 
 - 前端生产构建、FastAPI、PostgreSQL 16、Redis 7、Celery 和 FFmpeg 已部署。Nginx、数据库、Redis、API 和 worker 已启用开机自启。
-- 当前代码来自主分支 `main`，版本为 `1900fb7f7ceefca89af952f606e56165953bf952`。产品仅提供 Vlog 分析、重剪/补拍建议、HappyHorse 候选片段生成及补拍视频分析；已移除剪辑、成片版本管理和成片导出。保留 AI 素材下载。金黄主色 `#D8BC3C`，通知移至浮层；桌面素材和视频固定、镜头及建议分别滚动，0.5 秒最短镜头保持。
+- 当前代码来自主分支 `main`，版本为 `4c05a58f8dacf4ecd7f127bce2cfe9f662a9be8d`。产品仅提供 Vlog 分析、重剪/补拍建议、HappyHorse 候选片段生成及补拍视频分析；已移除剪辑、成片版本管理和成片导出。保留 AI 素材下载。金黄主色 `#D8BC3C`，通知移至浮层；桌面素材和视频固定、镜头及建议分别滚动，0.5 秒最短镜头保持。本次清理模式标签、版本脚注、滚动教学及重复小字，分析范围改为折叠详情。
 - 本次界面及功能收敛未修改分析配置或缓存版本。发布前用户的分析任务已自然完成，结果保持可用，不会仅因这次发布要求重新分析。更早模型/切分配置下的旧任务仍遵循原有过期校验。
 - 视频采样帧理解与新素材视觉验收为 `qwen3.8-max`，全片文字审阅为 `qwen-plus`。此前服务器真实图片请求返回一条通过 schema 校验的证据，用时 39.467 秒；此检查不代表质量或并发性能基准。本次合并未重新执行付费分析、生成或验收。
-- 服务器此前通过公网 HTTP 验证了 Vlog 切分、真实千问诊断和后台队列；当前发布包 Linux 上 182 项后端测试通过。此前 HappyHorse Provider 使用现有密钥查询云端生成任务，返回 `SUCCEEDED`；本次未额外发起付费分析、生成或验收。
+- 服务器此前通过公网 HTTP 验证了 Vlog 切分、真实千问诊断和后台队列；本次后端及部署配置与此前通过 Linux 182 项后端测试的 `1900fb7` 完全相同。此前 HappyHorse Provider 使用现有密钥查询云端生成任务，返回 `SUCCEEDED`；本次未额外发起付费分析、生成或验收。
 - 按用户要求使用 `http://47.110.79.237`，不跳转 HTTPS，不要求账号密码。公网页面、健康检查和项目接口均已通过当前电脑的系统代理返回 HTTP 200；Edge 浏览器也已实际打开页面。
 - 当前电脑绕过代理的直连测试仍超时，这与浏览器实际可访问的结果不同，不能据此认定安全组未放行。若某个网络无法访问，应分别检查客户端网络路径和服务器入口。
 - 数据库、Redis、后端与管理预览端口只监听回环地址。模型密钥只在受保护的服务端配置中。
@@ -19,7 +19,7 @@
 |路径或服务|用途|
 |---|---|
 |`/opt/xuguangji/current`|指向当前发布目录的符号链接|
-|`/opt/xuguangji/releases/analysis-focus-20260922`|当前主分支代码，分析与补全建议工作流及柔和金黄界面|
+|`/opt/xuguangji/releases/copy-cleanup-20260923`|当前主分支代码，清理重复小字与提示后的界面|
 |`/opt/xuguangji/venv`|Python 3.12 运行环境|
 |`/opt/xuguangji/certbot`|Certbot 5.8.0 独立环境|
 |`/etc/xuguangji/app.env`|数据库与百炼配置，`root:xuguangji`、`0640`|
@@ -83,6 +83,8 @@ systemctl list-timers xuguangji-cert-renew.timer
 
 代码更新使用新的 release 目录，上传源代码和 `frontend/dist`，安装 Linux 锁文件中的依赖，链接受保护的 `.env`，执行 Alembic 迁移，再切换 `current` 并重启两个服务。更新前应等正在执行的作业结束，并备份 PostgreSQL 与 `/var/lib/xuguangji/media`；回退代码不能代替数据库恢复。当前未配置异地备份或业务监控告警。
 
+纯前端发布可省去上述依赖安装、数据库迁移与服务重启：先确认新提交的后端、部署配置和依赖与运行版本完全一致，再将已验证的构建放入新 release，保留上一版哈希静态资源，并原子切换 `current`。Nginx 继续从该路径提供新前端，既有 API 和 worker 进程不受影响；回退时原子切回旧目录。
+
 ## Linux 依赖
 
 `backend/requirements-linux.lock` 在现有版本约束下为 Linux x86_64 / Python 3.12 解析，补齐该平台需要的 `greenlet`。其他包版本与已验证的本地锁文件一致。
@@ -98,7 +100,9 @@ uv pip compile backend/requirements.in --python-version 3.12 \
 
 ## 实际验证
 
-- 当前 `1900fb7` 发布包 Linux 后端测试：182 项通过（42.32 秒），本地同样 182 项通过。公网 `index-CNg-vIz0.js`、`index-D29r07hZ.css` 和 favicon 的 SHA256 与本地构建一致，首页及健康检查返回 200；全部五个剪辑/版本/成片导出 GET/POST 入口返回 410，OpenAPI 不再公开剪辑接口。原片及 preview 的 Range 返回 206，生成选项/历史返回 200；生成、素材和补拍分析接口保留。HTTP 免登录、不跳转 HTTPS。
+- `4c05a58` 为纯前端文案清理发布：TypeScript 检查及 Vite 构建通过，桌面和手机浏览器验证详见 [工作区细节调整](WORKSPACE_REFINEMENTS.md)。公网首页、health、projects 返回 200，项目数为 8；`index-C8LTXRMm.js`、`index-9tp9DRbt.css`、首页及 favicon 与本地构建字节一致。上一版哈希资源继续返回 200，原片和 preview 的 Range 均为 206。HTTP 无认证、不跳转 HTTPS。
+- 本次使用原子目录切换，API/worker/Nginx 的 PID 保持 `2011/2012/1296`，五项关键服务的进程与启动时间均未变化；后端、部署配置逐文件与旧 release 相同，环境文件字节未变。没有执行迁移、数据库/媒体写入或付费请求。旧目录 `/opt/xuguangji/releases/analysis-focus-20260922` 保留用于回退。
+- `1900fb7` 发布包 Linux 后端测试：182 项通过（42.32 秒），本地同样 182 项通过。公网 `index-CNg-vIz0.js`、`index-D29r07hZ.css` 和 favicon 的 SHA256 与本地构建一致，首页及健康检查返回 200；全部五个剪辑/版本/成片导出 GET/POST 入口返回 410，OpenAPI 不再公开剪辑接口。原片及 preview 的 Range 返回 206，生成选项/历史返回 200；生成、素材和补拍分析接口保留。HTTP 免登录、不跳转 HTTPS。
 - 用户分析任务 `d704ba65-2a13-4e93-bee6-77022c5b2e3c` 自然完成后才开始切换；停 API 前后数据库 active jobs 与 Redis queued/unacked 全为 0，worker 8 并发就绪后恢复 API。本次环境文件字节级未变，16 张表的数据 SHA256 和 854 个媒体文件（共 354,966,101 字节）的清单发布前后完全相同。备份目录为 `/opt/xuguangji/backups/analysis-focus-20260922`，含 PostgreSQL dump 和环境文件，旧 release 保留。
 - 新界面本地浏览器验收包含桌面固定工作区、手机无横向溢出、通知开关/错误恢复、复制重剪建议、AI 生成的时长校验与贴近按钮的禁用原因。所有预览服务只允许 GET，未创建付费任务；验证详情见 [工作区细节调整](WORKSPACE_REFINEMENTS.md)。
 - `bfa869a` 合并发布包 Linux 后端测试：168 项通过（43.30 秒），本地同样 168 项通过。公网 `index-B2h1lp4o.js`、`index-C8HVj4WI.css` 和 favicon 的 SHA256 与本地构建一致；页面、health、projects 及生成选项/历史接口均返回 200，媒体 Range 返回 206，无认证或 HTTPS 跳转。旧补拍任务正确提示重新分析并生成计划，重剪任务正确禁用 AI 生成。HappyHorse Provider 对此前真实云端任务执行只读查询，返回 `SUCCEEDED`，本次没有新提交计费请求。
