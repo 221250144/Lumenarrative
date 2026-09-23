@@ -196,11 +196,8 @@ export default function App() {
         </button>
         <div className="space-label">
           <span className="space-avatar">旭</span>
-          <div>
-            我的创作空间<small>Vlog 工作区</small>
-          </div>
+          <div>我的创作空间</div>
         </div>
-        <span className="nav-label">创作工具</span>
         <nav>
           {(
             [
@@ -233,9 +230,6 @@ export default function App() {
           </p>
           <span>以帧补光，以叙成章</span>
         </div>
-        <div className="sidebar-bottom">
-          <span className="status-dot" /> Vlog 专用 · v0.2
-        </div>
       </aside>
       <div className="main-shell">
         <header className="topbar">
@@ -247,20 +241,12 @@ export default function App() {
               {page === "projects" ? "我的项目" : project?.title || "载入中"}
             </strong>
           </div>
-          <div className="topbar-right">
-            <span
-              className={
-                "mode-badge " + (health?.provider === "mock" ? "demo" : "")
-              }
-            >
+          {health?.provider === "mock" && (
+            <span className="mode-badge demo">
               <i />
-              {health?.provider === "mock"
-                ? "演示数据模式"
-                : health
-                  ? "真实模型模式"
-                  : "连接中"}
+              演示数据
             </span>
-          </div>
+          )}
         </header>
         <main
           className={

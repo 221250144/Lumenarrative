@@ -67,9 +67,7 @@ export function Tasks({
     <div className="tasks-page">
       <div className="workspace-title">
         <div>
-          <span className="eyebrow">MAKE EVERY SHOT COUNT</span>
           <h1>Vlog 补拍与重剪清单</h1>
-          <p>查看重剪与补拍建议，生成候选镜头，或上传补拍视频分析。</p>
         </div>
         <div className="budget-control">
           <label>
@@ -130,16 +128,8 @@ export function Tasks({
             <small>处缺口</small>
           </strong>
         </div>
-        <div className="stat-note">
-          <Icon name="sun" size={28} />
-          <p>
-            补得恰到好处，
-            <br />
-            也是一种创作。
-          </p>
-        </div>
       </div>
-      {plan ? (
+      {plan && (plan.note || plan.uncovered_gap_ids.length > 0) ? (
         <details className="context-note plan-context">
           <summary>
             清单说明
@@ -152,7 +142,6 @@ export function Tasks({
               部分问题仍待确认，或未包含在当前时间预算中，可逐条查看后再决定。
             </p>
           )}
-          <p>按建议在剪辑软件中完成重剪；补拍视频可在对应任务下上传分析。</p>
           {plan.note && <p>{plan.note}</p>}
         </details>
       ) : null}
@@ -249,7 +238,7 @@ function TaskCard({
         </div>
         <div>
           <span className="eyebrow">
-            TASK {String(index + 1).padStart(2, "0")}
+            任务 {String(index + 1).padStart(2, "0")}
           </span>
           <h3>{labels[t.type]}</h3>
         </div>
@@ -344,9 +333,6 @@ function TaskCard({
             <Icon name="copy" size={13} />
             复制提示词
           </button>
-          <small>
-            可复制到其他生成工具，也可使用下方 HappyHorse 直接生成。
-          </small>
         </details>
       )}
       {["reshoot", "generate"].includes(t.type) && (
@@ -362,9 +348,6 @@ function TaskCard({
       <div className="task-submit">
         {t.type === "reedit" ? (
           <>
-            <p className="action-hint">
-              请在你使用的剪辑软件中，按上述位置和顺序调整视频。
-            </p>
             <button
               className="small-button"
               onClick={() =>
@@ -424,9 +407,6 @@ function TaskCard({
                 分析片段
               </button>
             </div>
-            <p className="action-hint">
-              对照这条补拍建议，分析新片段是否补足了缺失内容。
-            </p>
           </>
         )}
         {latest && (
@@ -466,11 +446,6 @@ function TaskCard({
                 {e.source_end_s.toFixed(1)}s
               </span>
             ))}
-            {latest.verification_status === "passed" && (
-              <small>
-                这段素材已满足本条补拍要求，可在剪辑软件中与原片组合。
-              </small>
-            )}
           </div>
         )}
       </div>

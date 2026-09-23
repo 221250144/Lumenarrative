@@ -88,9 +88,6 @@ export function VideoPlayer({
             ? seek.label || "关键片段回看"
             : "Vlog 原片预览"}
         </span>
-        <span className="mono">
-          {asset ? `${asset.width} × ${asset.height}` : "VLOG PREVIEW"}
-        </span>
       </div>
       <div className="video-stage">
         {asset?.preview_url ? (
@@ -107,15 +104,13 @@ export function VideoPlayer({
           <div className="player-empty">
             <Icon name="film" size={38} />
             <p>{asset ? "正在准备可播放的视频" : "上传或选择一条 Vlog"}</p>
-            <small>镜头和建议都可以在这里回看</small>
           </div>
         )}
       </div>
       {seek?.end !== undefined && (
         <div className="playback-range" role="status">
           <span className="mono">
-            {preciseTime(seek.at)} — {preciseTime(seek.end)}{" "}
-            <span>播至片段末尾自动暂停</span>
+            {preciseTime(seek.at)} — {preciseTime(seek.end)}
           </span>
           <button
             className="small-button"
@@ -136,19 +131,6 @@ export function VideoPlayer({
         </div>
         <span className="mono">{asset ? time(asset.duration_s) : "00:00"}</span>
       </div>
-      {asset && (
-        <div className="audio-note">
-          <Icon name="volume" size={14} />
-          {!asset.has_audio
-            ? "无音轨 · 只分析画面"
-            : asset.audio_status === "analyzed"
-              ? "音频已转写"
-              : asset.audio_status === "failed"
-                ? "音频分析失败 · 保留对白信息的不确定性"
-                : "尚未分析对白 · 画面未呈现的内容可能已由声音交代"}
-          {asset.synthetic_media && <span>程序生成的演示分镜卡</span>}
-        </div>
-      )}
     </div>
   );
 }

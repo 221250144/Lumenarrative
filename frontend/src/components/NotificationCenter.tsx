@@ -167,13 +167,8 @@ export function NotificationCenter({
               </p>
             )}
             {isDemo && (
-              <p className="notification-note">
-                当前为演示数据模式：视频处理真实运行，演示项目的分析来自固定样例；上传的视频不会被假装成已理解。
-              </p>
+              <p className="notification-note">演示项目的分析来自固定样例。</p>
             )}
-          </div>
-          <div className="notification-footer">
-            后台任务会继续运行，关闭面板不会中断处理。
           </div>
         </section>
       )}

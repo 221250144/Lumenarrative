@@ -22,10 +22,6 @@ export function Projects({
   const [search, setSearch] = useState("");
   return (
     <div className="projects-page">
-      <div className="page-topline">
-        <span className="eyebrow">YOUR STORY, IN A NEW LIGHT</span>
-        <span className="dim">看清镜头衔接，补好下一版 Vlog</span>
-      </div>
       <section className="hero">
         <div className="hero-copy">
           <div className="tagline">
@@ -89,7 +85,6 @@ export function Projects({
               03 / 结果
             </span>
           </div>
-          <span className="art-caption">CONNECT THE MOMENTS.</span>
         </div>
       </section>
       <div className="section-heading">
@@ -97,7 +92,6 @@ export function Projects({
           <h2>
             我的创作 <span className="count">{projects.length}</span>
           </h2>
-          <p>切分并审看 Vlog，获得具体补拍与重剪建议。</p>
         </div>
         <input
           className="search"
@@ -124,13 +118,11 @@ export function Projects({
                     <Icon name="film" size={44} />
                   </div>
                 )}
-                <span className="cover-tag">
-                  {p.demo_scenario
-                    ? "演示项目"
-                    : p.input_mode === "vlog"
-                      ? "Vlog 审看"
-                      : "旧版项目"}
-                </span>
+                {(p.demo_scenario || p.input_mode !== "vlog") && (
+                  <span className="cover-tag">
+                    {p.demo_scenario ? "演示项目" : "旧版项目"}
+                  </span>
+                )}
                 <span className="cover-time mono">
                   {time(p.duration_s || 0)}
                 </span>
@@ -160,8 +152,7 @@ export function Projects({
           <span className="new-circle">
             <Icon name="plus" size={24} />
           </span>
-          <strong>下一个故事，从这里开始</strong>
-          <span>上传一条 Vlog，开始审看</span>
+          <strong>新建 Vlog 项目</strong>
         </button>
       </div>
       {isDemo && (
@@ -183,10 +174,6 @@ export function Projects({
           ))}
         </div>
       )}
-      <footer className="quiet-footer">
-        <Icon name="sun" size={17} /> 以帧补光，以叙成章{" "}
-        <span>旭光集 · Vlog 创作空间</span>
-      </footer>
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <section
@@ -203,9 +190,7 @@ export function Projects({
             >
               <Icon name="close" />
             </button>
-            <span className="eyebrow">A NEW BEGINNING</span>
-            <h2 id="new-project-title">下一版 Vlog，从这里开始</h2>
-            <p className="dim">创建后上传一条由多个镜头剪辑而成的 Vlog。</p>
+            <h2 id="new-project-title">新建 Vlog 项目</h2>
             <form
               onSubmit={(e) => {
                 e.preventDefault();

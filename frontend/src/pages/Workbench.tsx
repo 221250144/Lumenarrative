@@ -55,7 +55,6 @@ export function Workbench({
     (a) => a.id === project.constraints_json.primary_asset_id,
   );
   const active = assets.find((a) => a.id === selected) || primary;
-  const legacy = !!diagnosis && !diagnosis.vlog;
   const diagnosisCurrent =
     !!diagnosis?.vlog &&
     !diagnosis.analysis.stale &&
@@ -129,6 +128,14 @@ export function Workbench({
   ];
   const ready = project.input_mode === "vlog" && primary?.status === "ready";
   const processed = assets.filter((a) => a.status === "ready");
+  const coverage = diagnosis?.analysis.coverage;
+  const planDisabledReason = busy
+    ? "正在处理，请稍后生成清单。"
+    : !diagnosisCurrent
+      ? "请先重新分析当前 Vlog，再生成建议清单。"
+      : !actionable.length
+        ? "当前没有需要加入清单的修改建议。"
+        : "";
   const acceptUpload = (files: File[]) => {
     if (busy) return;
     if (files.length !== 1) {
@@ -144,11 +151,10 @@ export function Workbench({
     <div className="vlog-workspace">
       <div className="workspace-title">
         <div>
-          <span className="eyebrow">VLOG REVIEW WORKSPACE</span>
           <h1>{project.title}</h1>
           <p>
-            一条 Vlog，逐镜看清楚 <span>/</span> {project.style} <span>/</span>{" "}
-            目标 {time(project.target_duration_s)}
+            {project.style} <span>/</span> 目标{" "}
+            {time(project.target_duration_s)}
           </p>
         </div>
         <button
@@ -166,7 +172,6 @@ export function Workbench({
             <h3>
               <Icon name="film" />主 Vlog
             </h3>
-            <span>每次审看一条</span>
           </div>
           {primary && (
             <div className="primary-vlog">
@@ -218,10 +223,6 @@ export function Workbench({
               <strong>
                 {primary ? "上传另一版 Vlog" : "上传一条剪好的 Vlog"}
               </strong>
-              <span>
-                {primary ? "上传后选择设为主片" : "拖放一个视频或点击上传"}
-              </span>
-              <small>MP4 / MOV / WebM / MKV / AVI</small>
             </button>
           </div>
           <input
@@ -260,13 +261,6 @@ export function Workbench({
                   </option>
                 ))}
               </select>
-              {project.input_mode !== "vlog" ? (
-                <p className="action-hint" role="status">
-                  请为这个历史项目选择一条剪好的 Vlog 作为主片，再开始分析。
-                </p>
-              ) : (
-                <small>只分析所选主片。补拍视频在对应建议下单独上传。</small>
-              )}
             </div>
           )}
           {!!assets.filter((a) => a.id !== primary?.id && a.status !== "ready")
@@ -299,9 +293,8 @@ export function Workbench({
               onChange={(e) => setIntent(e.target.value)}
               rows={5}
             />
-            <div className="intent-footer">
-              <span>写下你担心的衔接或表达问题。</span>
-              {intent !== project.intent && (
+            {intent !== project.intent && (
+              <div className="intent-footer">
                 <button
                   disabled={busy || !intent.trim()}
                   className="small-button"
@@ -309,13 +302,15 @@ export function Workbench({
                 >
                   保存
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </section>
-          <div className="library-footer">
-            <Icon name="folder" size={14} />
-            {Math.max(0, assets.length - (primary ? 1 : 0))} 条其他素材已保留
-          </div>
+          {assets.length > (primary ? 1 : 0) && (
+            <div className="library-footer">
+              <Icon name="folder" size={14} />
+              {assets.length - (primary ? 1 : 0)} 条其他素材
+            </div>
+          )}
         </aside>
         <div className="preview-column">
           <div className="review-player" ref={playerRef}>
@@ -331,13 +326,6 @@ export function Workbench({
                 <Icon name="layers" />
                 镜头切分 <span>{shots.length}</span>
               </h3>
-              <span>按原片顺序 · 点击回看</span>
-            </div>
-            <div className="review-scroll-hint shot-scroll-hint">
-              <span>
-                <span aria-hidden="true">↕</span> 独立滚动镜头列表
-              </span>
-              <small>点击镜头回看</small>
             </div>
             <div
               className="shot-scroll"
@@ -346,11 +334,6 @@ export function Workbench({
               role="region"
               aria-labelledby="vlog-shots-title"
             >
-              {!!shots.length && (
-                <p className="shot-explanation">
-                  按转场切分，不足0.5秒的片段已并入相邻镜头，原视频不变。
-                </p>
-              )}
               {shots.length ? (
                 <>
                   {diagnosisCurrent && !!diagnosis.vlog?.chapters.length && (
@@ -435,14 +418,12 @@ export function Workbench({
                                 {(shot.end_s - shot.start_s).toFixed(1)} 秒
                               </small>
                             </span>
-                            <small>
-                              {shot.boundary_type === "start"
-                                ? "原片开头"
-                                : shot.boundary_type === "fade_candidate"
-                                  ? "渐变转场候选 · 请回看核实"
-                                  : "画面切换"}
-                              {shot.observed === false ? " · 待核实" : ""}
-                            </small>
+                            {shot.boundary_type === "fade_candidate" && (
+                              <small>渐变转场待核实</small>
+                            )}
+                            {shot.observed === false && shot.summary && (
+                              <small>画面分析未完成</small>
+                            )}
                           </div>
                           <Icon name="play" size={15} />
                         </button>
@@ -452,10 +433,12 @@ export function Workbench({
               ) : (
                 <div className="inline-empty">
                   {!primary
-                    ? "先上传或选择一条 Vlog，处理完成后会按原片顺序展示镜头。"
-                    : primary.status !== "ready"
-                      ? "正在读取视频并检测转场，处理完成后自动展示镜头。"
-                      : "这条视频还没有新版切分结果。点击“分析这条 Vlog”，生成镜头切分与具体建议。"}
+                    ? "尚未选择 Vlog"
+                    : primary.status === "failed"
+                      ? "视频处理失败"
+                      : primary.status !== "ready"
+                        ? "正在检测镜头…"
+                        : "尚无镜头分析结果"}
                 </div>
               )}
             </div>
@@ -476,15 +459,12 @@ export function Workbench({
               <Icon name="spark" />
               具体修改建议
             </h3>
-            {diagnosis && (
-              <span className="badge">
-                {legacy
-                  ? "历史结果"
-                  : diagnosis.analysis.provider === "mock"
-                    ? "演示数据"
-                    : "Vlog 审看"}
-              </span>
-            )}
+            {diagnosis &&
+              (!diagnosisCurrent || diagnosis.analysis.provider === "mock") && (
+                <span className="badge">
+                  {!diagnosisCurrent ? "旧结果" : "演示数据"}
+                </span>
+              )}
           </div>
           <div className="diagnosis-tabs">
             <button
@@ -502,51 +482,18 @@ export function Workbench({
             </button>
           </div>
           <div
-            className="review-scroll-hint diagnosis-scroll-hint"
-            id="diagnosis-scroll-hint"
-          >
-            <span>
-              <span aria-hidden="true">↕</span> 在这里上下滚动查看建议
-            </span>
-            <small>点击证据回看</small>
-          </div>
-          <div
             className="diagnosis-scroll"
             ref={diagnosisScrollRef}
             tabIndex={0}
             role="region"
             aria-labelledby="vlog-diagnosis-title"
-            aria-describedby="diagnosis-scroll-hint"
           >
-            {diagnosis && !diagnosisCurrent && (
-              <p className="action-hint" role="status">
-                {legacy
-                  ? "这里保留的是历史分析。选好主片后，点击“重新按 Vlog 分析”更新建议。"
-                  : "主片、审看重点或分析配置已更新。请重新分析当前 Vlog，再使用这些建议。"}
-              </p>
-            )}
             {!diagnosis ? (
               <div className="diagnosis-empty">
                 <div className="empty-spark">
                   <Icon name="spark" size={32} />
                 </div>
-                <h3>具体到某一秒、某一镜。</h3>
-                <p>
-                  先上传一条 Vlog，查看镜头切分，
-                  <br />
-                  再分析换地点、动作跳跃、
-                  <br />
-                  结果交代等具体问题。
-                </p>
-                <div className="principle">
-                  <Icon name="check" size={14} /> 每次最多 5 条优先建议
-                </div>
-                <div className="principle">
-                  <Icon name="check" size={14} /> 每条最多 2 段关键证据
-                </div>
-                <div className="principle">
-                  <Icon name="check" size={14} /> 说清补拍什么，插在哪里
-                </div>
+                <h3>等待 Vlog 分析</h3>
               </div>
             ) : tab === "requirements" ? (
               <div className="requirement-list">
@@ -591,17 +538,7 @@ export function Workbench({
                           ? "当前信息还不足以下结论"
                           : "暂未发现需要补拍的问题"}
                     </strong>
-                    <p>
-                      {legacy
-                        ? "旧版结果可回看，建议重新分析。"
-                        : actionable.length
-                          ? "先回看对应镜头，再决定是否采用。"
-                          : cannotConclude
-                            ? "演示结果或不完整的画面分析，不能确认这条 Vlog 是否还需补拍。"
-                            : primary?.has_audio
-                              ? "当前画面未发现必要缺口；可结合对白继续人工审看。"
-                              : "当前画面未发现必要缺口；可继续回看切点和画面节奏。"}
-                    </p>
+                    {cannotConclude && <p>当前分析不足以确认是否还需补拍。</p>}
                   </div>
                 </div>
                 <div className="gap-list">
@@ -629,53 +566,67 @@ export function Workbench({
                     noun="历史建议"
                   />
                 )}
-                {diagnosis.analysis.coverage && (
-                  <div className="coverage-note">
-                    <Icon name="eye" size={14} />
-                    <div>
-                      {diagnosis.analysis.coverage.visual_complete
-                        ? "画面分析已完成"
-                        : "部分画面未完成分析，结论需要复核"}
-                      {!diagnosis.analysis.coverage.audio_complete
-                        ? " · 对白信息尚未完整核实"
-                        : ""}
-                      <details>
-                        <summary>查看分析范围</summary>
-                        <small>
-                          {diagnosis.analysis.coverage.sampling_note}
-                        </small>
-                        {diagnosis.analysis.coverage.failed_ranges
-                          .slice(0, 3)
-                          .map((f, i) => (
-                            <small className="warning-text" key={i}>
-                              {f.reason}
-                            </small>
-                          ))}
-                      </details>
-                    </div>
-                  </div>
-                )}
               </>
+            )}
+            {(primary || coverage) && (
+              <div className="coverage-note">
+                <Icon name="eye" size={14} />
+                <div>
+                  <details>
+                    <summary>分析范围</summary>
+                    {primary && (
+                      <small>
+                        {!primary.has_audio
+                          ? "主片无音轨，只分析画面。"
+                          : primary.audio_status === "analyzed"
+                            ? "主片音频已转写。"
+                            : primary.audio_status === "failed"
+                              ? "主片音频分析失败，对白信息尚未核实。"
+                              : "主片对白尚未分析。"}
+                      </small>
+                    )}
+                    {coverage && (
+                      <>
+                        <small>
+                          {coverage.visual_complete
+                            ? "画面分析已完成。"
+                            : "部分画面未完成分析，结论需要复核。"}
+                        </small>
+                        <small>
+                          {coverage.audio_complete
+                            ? "本次分析的对白信息已完整核实。"
+                            : "本次分析的对白信息尚未完整核实。"}
+                        </small>
+                        <small>{coverage.sampling_note}</small>
+                        {coverage.failed_ranges.slice(0, 3).map((f, i) => (
+                          <small className="warning-text" key={i}>
+                            {f.reason}
+                          </small>
+                        ))}
+                      </>
+                    )}
+                  </details>
+                </div>
+              </div>
             )}
           </div>
           {diagnosis && tab === "gaps" && (
             <div className="diagnosis-bottom">
               <button
                 className="primary full-width"
-                disabled={busy || !diagnosisCurrent || !actionable.length}
+                disabled={!!planDisabledReason}
+                aria-describedby={
+                  planDisabledReason ? "workbench-plan-disabled" : undefined
+                }
                 onClick={onPlan}
               >
                 生成补拍与重剪清单 <Icon name="arrow" />
               </button>
-              <small className="action-hint">
-                {busy
-                  ? "正在处理，请稍后生成清单。"
-                  : !diagnosisCurrent
-                    ? "请先重新分析当前 Vlog，再生成建议清单。"
-                    : !actionable.length
-                      ? "当前没有需要加入清单的修改建议。"
-                      : "未确认的建议会保留为待核实任务。"}
-              </small>
+              {planDisabledReason && (
+                <small className="action-hint" id="workbench-plan-disabled">
+                  {planDisabledReason}
+                </small>
+              )}
             </div>
           )}
         </aside>
@@ -817,9 +768,6 @@ function GapCard({
 }) {
   const [reason, setReason] = useState("");
   const selectedEvidence = keyEvidence(g.evidence_ids, evidence);
-  const originalCount = new Set(
-    g.evidence_ids.filter((id) => evidence.some((e) => e.id === id)),
-  ).size;
   const shotIndex = shots.findIndex(
     (shot) =>
       shot.id === g.anchor?.shot_id ||
@@ -957,12 +905,6 @@ function GapCard({
               </small>
             </button>
           ))}
-          {originalCount > selectedEvidence.length && (
-            <small>
-              已合并重复范围，仅显示 {selectedEvidence.length} 段关键证据（原有{" "}
-              {originalCount} 条）。
-            </small>
-          )}
         </div>
       )}
       {!selectedEvidence.length && (

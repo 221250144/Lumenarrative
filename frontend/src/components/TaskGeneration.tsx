@@ -290,15 +290,10 @@ export function TaskGeneration({
     >
       <summary>
         <Icon name="spark" size={17} />
-        <span>
-          AI 生成补全片段<small>HappyHorse · 首帧驱动</small>
-        </span>
+        <span>AI 生成补全片段</span>
         <span className="badge">AI 候选</span>
       </summary>
       <div className="generation-body">
-        <p className="generation-description">
-          按这条补拍建议生成候选镜头，再分析它是否满足补拍要求。
-        </p>
         {loading ? (
           <p className="generation-status" role="status">
             <span className="spinner" />
@@ -378,7 +373,7 @@ export function TaskGeneration({
               </label>
               <div className="generation-settings">
                 <label>
-                  片段时长
+                  片段时长（3–15 秒）
                   <input
                     type="number"
                     min={3}
@@ -393,7 +388,6 @@ export function TaskGeneration({
                       )
                     }
                   />
-                  <small>3–15 秒</small>
                 </label>
                 <label>
                   清晰度
@@ -413,7 +407,7 @@ export function TaskGeneration({
               </div>
             </fieldset>
             <p className="generation-note" id={generationTermsId}>
-              会使用百炼视频生成额度。仅按首帧生成，片段结尾与下一镜头的衔接需要审看。
+              生成会消耗百炼视频生成额度。
             </p>
             {error && (
               <p className="generation-error" role="alert">
@@ -463,7 +457,6 @@ export function TaskGeneration({
                 value={currentJob.completed_units}
               />
             )}
-            <small>任务在后台运行，离开页面后仍会继续。</small>
           </div>
         )}
         {currentJob?.status === "failed" && (
@@ -559,10 +552,6 @@ export function TaskGeneration({
                         : "分析此片段"}
                   </button>
                 </div>
-                <small>
-                  分析会对照本条补拍要求逐项检查。下载后可在剪辑软件中使用这段
-                  AI 候选素材。
-                </small>
               </>
             ) : (
               <p className="generation-note">
