@@ -28,7 +28,7 @@ async def lifespan(app):
     yield
 
 
-app = FastAPI(title="旭光集 API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="叙光集 API", version="0.1.0", lifespan=lifespan)
 app.include_router(router)
 app.include_router(generation_router)
 

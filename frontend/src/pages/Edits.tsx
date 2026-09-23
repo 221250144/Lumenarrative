@@ -338,7 +338,7 @@ export function Edits({
                 <a
                   className="primary small"
                   href={e.output_url}
-                  download="旭光集-Vlog.mp4"
+                  download="叙光集-Vlog.mp4"
                 >
                   <Icon name="download" size={14} />
                   MP4

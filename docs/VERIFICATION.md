@@ -12,7 +12,7 @@
 - 服务器新版经公网 HTTP 实测：上传、Celery 预处理、3 个镜头、百炼真实分析、MP4 导出全部成功。页面 HTTP 200，视频 Range 206；FFprobe 检出 H.264 + AAC、3.021 秒；无 HTTPS 重定向或登录挑战。
 - 发布目录 `/opt/xuguangji/releases/vlog-v2-20260922-1`，切换前备份 PostgreSQL 与媒体，保留已有项目与历史分析。
 
-# 旭光集 v0.1 验证记录
+# 叙光集 v0.1 验证记录
 
 日期：2026-09-22。环境：macOS、Python 3.12.14、Node 24.19.0、FFmpeg 9.0.2、SQLite、本地单 worker。
 

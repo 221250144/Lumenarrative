@@ -185,7 +185,7 @@ export function Projects({
       )}
       <footer className="quiet-footer">
         <Icon name="sun" size={17} /> 以帧补光，以叙成章{" "}
-        <span>旭光集 · Vlog 创作空间</span>
+        <span>叙光集 · Vlog 创作空间</span>
       </footer>
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>

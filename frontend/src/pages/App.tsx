@@ -192,11 +192,11 @@ export default function App() {
             <Icon name="sun" size={27} />
           </span>
           <span>
-            旭光集<small>LUMENARRATIVE</small>
+            叙光集<small>LUMENARRATIVE</small>
           </span>
         </button>
         <div className="space-label">
-          <span className="space-avatar">旭</span>
+          <span className="space-avatar">叙</span>
           <div>
             我的创作空间<small>Vlog 工作区</small>
           </div>
